@@ -1,0 +1,1795 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WEBP FORGE — Convertidor WebP profesional</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080B14; --surface:#0F1729; --surface-2:#162040; --surface-3:#1D2A52;
+  --accent:#00D4FF; --accent-2:#7C3AED;
+  --ok:#10B981; --warn:#F59E0B; --err:#EF4444;
+  --text:#F0F4FF; --text-2:#8892AA;
+  --border:rgba(136,146,170,.18); --border-glow:rgba(0,212,255,.45);
+  --glow:0 0 20px rgba(0,212,255,.3);
+  --r:14px;
+  --font-ui:'Inter',system-ui,sans-serif; --font-display:'Space Grotesk','Inter',sans-serif; --font-mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:dark}
+body{
+  background:var(--bg);color:var(--text);font-family:var(--font-ui);font-size:14px;line-height:1.5;min-height:100vh;
+  background-image:radial-gradient(900px 500px at 15% -10%,rgba(124,58,237,.14),transparent 60%),radial-gradient(900px 500px at 85% -10%,rgba(0,212,255,.10),transparent 60%);
+  background-attachment:fixed;
+}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:8px;border:2px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:#2A3A6E}
+::selection{background:rgba(0,212,255,.3)}
+button{font-family:inherit;cursor:pointer}
+input,select{font-family:inherit}
+
+/* ====== HEADER ====== */
+header{
+  position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:18px;padding:14px 26px;
+  background:rgba(8,11,20,.75);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--border);
+}
+.logo{display:flex;align-items:center;gap:11px}
+.logo-mark{
+  width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-size:19px;
+  background:linear-gradient(135deg,rgba(0,212,255,.2),rgba(124,58,237,.25));border:1px solid var(--border-glow);box-shadow:var(--glow);
+}
+.logo h1{font-family:var(--font-display);font-size:21px;font-weight:700;letter-spacing:2.5px}
+.logo h1 b{color:var(--accent);font-weight:700}
+.logo small{display:block;font-size:10px;color:var(--text-2);letter-spacing:1.5px;font-weight:400}
+#api-status{display:flex;gap:7px;flex-wrap:wrap;margin-left:6px}
+.chip{
+  display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:99px;font-family:var(--font-mono);font-size:10.5px;
+  background:var(--surface);border:1px solid var(--border);color:var(--text-2);cursor:default;
+}
+.chip.on{color:var(--ok);border-color:rgba(16,185,129,.35)}
+.chip.off{color:var(--warn);border-color:rgba(245,158,11,.35)}
+#global-counter{margin-left:auto;font-family:var(--font-mono);font-size:12px;color:var(--text-2);white-space:nowrap}
+#global-counter b{color:var(--accent);font-weight:500}
+
+/* ====== DROP ZONE ====== */
+main{max-width:1180px;margin:0 auto;padding:26px 22px 90px}
+#dropzone{
+  position:relative;border:2px dashed rgba(0,212,255,.30);border-radius:20px;padding:54px 30px;text-align:center;
+  background:linear-gradient(180deg,rgba(15,23,41,.6),rgba(15,23,41,.25));transition:all .3s ease;cursor:pointer;overflow:hidden;
+  animation:pulse 3.2s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{border-color:rgba(0,212,255,.30)}50%{border-color:rgba(0,212,255,.65)}}
+#dropzone.drag{
+  border-color:var(--accent);border-style:solid;background:rgba(0,212,255,.07);
+  box-shadow:0 0 50px rgba(0,212,255,.25),inset 0 0 80px rgba(0,212,255,.06);transform:scale(1.005);animation:none;
+}
+#dropzone .dz-icon{font-size:42px;margin-bottom:10px;filter:drop-shadow(0 0 14px rgba(0,212,255,.5))}
+#dropzone h2{font-family:var(--font-display);font-size:22px;font-weight:500;margin-bottom:6px}
+#dropzone p{color:var(--text-2);font-size:13px;margin-bottom:18px}
+#dropzone .dz-buttons{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+#analyze-progress{display:none;margin-top:16px;font-family:var(--font-mono);font-size:12.5px;color:var(--accent)}
+
+/* ====== BOTONES ====== */
+.btn{
+  display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:10px;border:1px solid var(--border);
+  background:var(--surface-2);color:var(--text);font-size:13px;font-weight:500;transition:all .3s ease;white-space:nowrap;
+}
+.btn:hover{border-color:var(--border-glow);box-shadow:var(--glow);transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn:disabled{opacity:.40;pointer-events:none}
+.btn-primary{
+  background:linear-gradient(135deg,#0099CC,#7C3AED);border:none;font-weight:600;font-size:14px;padding:11px 24px;
+  box-shadow:0 4px 18px rgba(0,212,255,.25);
+}
+.btn-primary:hover{box-shadow:0 4px 28px rgba(0,212,255,.45)}
+.btn-sm{padding:5px 12px;font-size:12px;border-radius:8px}
+.btn-ok{border-color:rgba(16,185,129,.4);color:var(--ok)}
+.btn-danger{border-color:rgba(239,68,68,.4);color:var(--err)}
+
+/* ====== CONTROLES GLOBALES ====== */
+#controls{
+  display:none;flex-wrap:wrap;gap:11px;align-items:center;margin-top:20px;padding:15px 17px;
+  background:rgba(15,23,41,.85);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:var(--r);
+  position:sticky;top:67px;z-index:40;
+}
+#controls select{
+  background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:8px 11px;font-size:13px;outline:none;transition:border-color .3s;
+}
+#controls select:focus{border-color:var(--border-glow)}
+#search{
+  background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:13px;outline:none;width:170px;transition:all .3s;
+}
+#search:focus{border-color:var(--border-glow);box-shadow:var(--glow)}
+.spacer{flex:1}
+#filters{display:none;gap:7px;flex-wrap:wrap;margin-top:13px}
+.filter-chip{
+  padding:5px 14px;border-radius:99px;border:1px solid var(--border);background:transparent;color:var(--text-2);font-size:12px;transition:all .3s ease;
+}
+.filter-chip:hover{color:var(--text);border-color:var(--border-glow)}
+.filter-chip.active{background:rgba(0,212,255,.12);border-color:var(--accent);color:var(--accent)}
+.filter-chip .n{font-family:var(--font-mono);font-size:10.5px;opacity:.8}
+
+/* ====== TARJETAS ====== */
+#list{margin-top:18px;display:flex;flex-direction:column;gap:11px}
+.card{
+  position:relative;border-radius:var(--r);border:1px solid var(--border);
+  background:rgba(15,23,41,.72);backdrop-filter:blur(8px);transition:border-color .3s ease,box-shadow .3s ease,opacity .3s;
+  overflow:hidden;
+}
+.card:hover{border-color:rgba(0,212,255,.30)}
+.card.selected{border-color:rgba(0,212,255,.45);box-shadow:0 0 14px rgba(0,212,255,.12)}
+.card.processing{border-color:transparent}
+.card.processing::before{
+  content:'';position:absolute;inset:-150%;z-index:0;
+  background:conic-gradient(from 0deg,transparent 0 70%,var(--accent) 82%,var(--accent-2) 92%,transparent 100%);
+  animation:spin 2.2s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.card.processing::after{content:'';position:absolute;inset:1.5px;border-radius:12.5px;background:#0E1527;z-index:0}
+.card-inner{position:relative;z-index:1;padding:14px 16px;display:flex;gap:14px;align-items:flex-start}
+.card.err-card{border-color:rgba(239,68,68,.4)}
+.card.done-card{border-color:rgba(16,185,129,.35)}
+.sel-box{margin-top:26px;accent-color:var(--accent);width:16px;height:16px;cursor:pointer;flex-shrink:0}
+.thumb{
+  width:74px;height:74px;border-radius:10px;flex-shrink:0;object-fit:cover;border:1px solid var(--border);
+  background:repeating-conic-gradient(#141C33 0 25%,#0D1426 0 50%) 0 0/16px 16px;
+}
+.thumb-skel{animation:shimmer 1.4s ease-in-out infinite}
+@keyframes shimmer{0%,100%{opacity:.45}50%{opacity:1}}
+.card-body{flex:1;min-width:0}
+.card-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.fname{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:46ch}
+.badge{
+  padding:2.5px 9px;border-radius:6px;font-family:var(--font-mono);font-size:10px;font-weight:500;letter-spacing:.4px;white-space:nowrap;
+}
+.badge.static{background:rgba(59,130,246,.16);color:#60A5FA;border:1px solid rgba(59,130,246,.35)}
+.badge.anim{background:rgba(124,58,237,.18);color:#A78BFA;border:1px solid rgba(124,58,237,.4)}
+.badge.video{background:rgba(245,158,11,.15);color:var(--warn);border:1px solid rgba(245,158,11,.35)}
+.badge.invalid{background:rgba(239,68,68,.15);color:var(--err);border:1px solid rgba(239,68,68,.4)}
+.fmeta{font-family:var(--font-mono);font-size:11px;color:var(--text-2);margin-top:3px}
+.fmeta b{color:var(--text);font-weight:500}
+.card-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+.fmt-select{
+  background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 9px;font-size:12.5px;outline:none;font-family:var(--font-mono);
+}
+.q-wrap{display:flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:11px;color:var(--text-2)}
+.q-wrap input[type=range]{width:110px;accent-color:var(--accent);cursor:pointer}
+.progress-row{display:none;margin-top:10px;align-items:center;gap:10px}
+.pbar{flex:1;height:7px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.pbar-fill{
+  height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent-2));
+  transition:width .25s ease;box-shadow:0 0 8px rgba(0,212,255,.5);
+}
+.ptext{font-family:var(--font-mono);font-size:11px;color:var(--accent);white-space:nowrap}
+.status-line{margin-top:8px;font-size:12px;display:none}
+.status-line.ok{color:var(--ok)}
+.status-line.error{color:var(--err)}
+.result-row{display:none;margin-top:10px;gap:8px;flex-wrap:wrap;align-items:center}
+.savings{font-family:var(--font-mono);font-size:11px;color:var(--text-2)}
+.savings .pos{color:var(--ok)} .savings .neg{color:var(--warn)}
+details.stack{margin-top:6px;font-size:11px;color:var(--text-2)}
+details.stack pre{
+  font-family:var(--font-mono);font-size:10px;background:#0A0F1E;border:1px solid var(--border);border-radius:8px;
+  padding:8px;margin-top:5px;white-space:pre-wrap;max-height:120px;overflow:auto;
+}
+.card-x{
+  position:absolute;top:9px;right:11px;z-index:2;background:none;border:none;color:var(--text-2);font-size:15px;
+  padding:3px 7px;border-radius:7px;transition:all .3s;
+}
+.card-x:hover{color:var(--err);background:rgba(239,68,68,.12)}
+
+/* ====== STATS PANEL ====== */
+#stats{
+  position:fixed;right:18px;bottom:18px;z-index:60;min-width:215px;padding:13px 16px;border-radius:13px;
+  background:rgba(15,23,41,.92);backdrop-filter:blur(12px);border:1px solid var(--border-glow);box-shadow:var(--glow);
+  font-family:var(--font-mono);font-size:11.5px;display:none;
+}
+#stats h4{font-family:var(--font-display);font-size:12px;letter-spacing:1.2px;color:var(--accent);margin-bottom:7px}
+#stats div{display:flex;justify-content:space-between;gap:14px;color:var(--text-2);padding:1.5px 0}
+#stats b{color:var(--text);font-weight:500}
+
+/* ====== MODAL ====== */
+#modal{
+  position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:26px;
+  background:rgba(4,6,12,.82);backdrop-filter:blur(8px);
+}
+#modal.open{display:flex}
+.modal-box{
+  background:var(--surface);border:1px solid var(--border-glow);border-radius:18px;box-shadow:0 0 60px rgba(0,212,255,.18);
+  max-width:1020px;width:100%;max-height:92vh;overflow:auto;padding:22px;
+}
+.modal-head{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.modal-head h3{font-family:var(--font-display);font-size:17px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+@media (max-width:760px){.compare{grid-template-columns:1fr}}
+.compare .pane{background:#0A0F1E;border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
+.pane h5{font-family:var(--font-mono);font-size:11px;color:var(--text-2);letter-spacing:1px;margin-bottom:9px}
+.pane img,.pane video{
+  max-width:100%;max-height:54vh;border-radius:8px;
+  background:repeating-conic-gradient(#141C33 0 25%,#0D1426 0 50%) 0 0/18px 18px;
+}
+.pane .sz{font-family:var(--font-mono);font-size:11.5px;margin-top:9px;color:var(--text-2)}
+.pane .sz b{color:var(--accent)}
+
+/* ====== TOASTS ====== */
+#toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:120;display:flex;flex-direction:column;gap:9px;align-items:center}
+.toast{
+  padding:10px 20px;border-radius:11px;background:var(--surface-2);border:1px solid var(--border-glow);
+  box-shadow:var(--glow);font-size:13px;animation:toastIn .3s ease;max-width:560px;
+}
+.toast.warn{border-color:rgba(245,158,11,.5);box-shadow:0 0 18px rgba(245,158,11,.2)}
+.toast.err{border-color:rgba(239,68,68,.55);box-shadow:0 0 18px rgba(239,68,68,.22)}
+@keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.fade-out{opacity:0;transition:opacity .4s}
+
+#empty-filter{display:none;text-align:center;color:var(--text-2);padding:34px;font-size:13px}
+kbd{
+  font-family:var(--font-mono);font-size:10px;background:var(--surface-2);border:1px solid var(--border);
+  border-bottom-width:2px;border-radius:5px;padding:1px 6px;color:var(--text-2);
+}
+footer{margin-top:34px;text-align:center;color:var(--text-2);font-size:11.5px}
+footer .keys{margin-top:6px}
+@media (max-width:720px){
+  header{padding:10px 14px;flex-wrap:wrap}
+  #global-counter{width:100%;margin-left:0}
+  #controls{position:static}
+  .fname{max-width:24ch}
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">⚡</div>
+    <div>
+      <h1>WEBP <b>FORGE</b></h1>
+      <small>WEBP · WEBM · MP4 → TODO FORMATO · 100% LOCAL</small>
+    </div>
+  </div>
+  <div id="api-status" title="Capacidades detectadas en este navegador"></div>
+  <div id="global-counter"><b>0</b> archivos &nbsp;|&nbsp; <b>0</b> completados &nbsp;|&nbsp; <b>0</b> procesando</div>
+</header>
+
+<main>
+  <!-- ZONA DE CARGA -->
+  <div id="dropzone" tabindex="0" role="button" aria-label="Zona para soltar archivos WebP">
+    <div class="dz-icon">📥</div>
+    <h2>Arrastra tus archivos WebP, WebM o MP4 aquí</h2>
+    <p>Sin límite de archivos · acepta carpetas completas y videos · todo se procesa en tu equipo, nada se sube a internet</p>
+    <div class="dz-buttons">
+      <button class="btn btn-primary" id="btn-pick">📂 Seleccionar archivos</button>
+      <button class="btn" id="btn-pick-dir">🗂 Seleccionar carpeta</button>
+    </div>
+    <div id="analyze-progress"></div>
+    <input type="file" id="file-input" accept=".webp,.webm,.mp4,.m4v,image/webp,video/webm,video/mp4" multiple hidden>
+    <input type="file" id="dir-input" webkitdirectory hidden>
+  </div>
+
+  <!-- CONTROLES GLOBALES -->
+  <div id="controls">
+    <button class="btn btn-sm" id="btn-selall">Seleccionar todo</button>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2)">
+      Convertir seleccionados a:
+      <select id="global-format">
+        <option value="">— por archivo —</option>
+        <option value="jpg">JPG</option><option value="png">PNG</option><option value="gif">GIF</option>
+        <option value="mp4">MP4</option><option value="webm">WebM</option><option value="bmp">BMP</option>
+      </select>
+    </label>
+    <button class="btn btn-primary" id="btn-convert">🚀 Convertir seleccionados</button>
+    <button class="btn btn-ok" id="btn-zip" disabled>⬇ Descargar todos (ZIP)</button>
+    <div class="spacer"></div>
+    <input type="search" id="search" placeholder="🔍 Buscar archivo…">
+    <label style="display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;color:var(--text-2)" title="Conversiones simultáneas">
+      ∥ <select id="parallel"><option>1</option><option>2</option><option selected>4</option><option>6</option></select>
+    </label>
+    <button class="btn btn-sm btn-danger" id="btn-clear" title="Quitar todos los archivos de la lista">🗑 Limpiar</button>
+  </div>
+
+  <!-- FILTROS -->
+  <div id="filters">
+    <button class="filter-chip active" data-f="all">Todos <span class="n"></span></button>
+    <button class="filter-chip" data-f="static">🟦 Imágenes <span class="n"></span></button>
+    <button class="filter-chip" data-f="anim">🟣 Animados <span class="n"></span></button>
+    <button class="filter-chip" data-f="video">🟠 Video <span class="n"></span></button>
+    <button class="filter-chip" data-f="done">✅ Completados <span class="n"></span></button>
+    <button class="filter-chip" data-f="error">⛔ Con error <span class="n"></span></button>
+  </div>
+
+  <!-- LISTA -->
+  <div id="list"></div>
+  <div id="empty-filter">No hay archivos que coincidan con este filtro o búsqueda.</div>
+
+  <footer>
+    <div>WEBP FORGE · procesamiento 100% local en tu navegador · ningún archivo sale de tu equipo</div>
+    <div class="keys"><kbd>Ctrl+A</kbd> seleccionar todo · <kbd>Enter</kbd> convertir seleccionados · <kbd>Space</kbd> preview · <kbd>Esc</kbd> cerrar</div>
+  </footer>
+</main>
+
+<!-- PANEL DE ESTADÍSTICAS -->
+<div id="stats">
+  <h4>⚙ ESTADÍSTICAS</h4>
+  <div><span>Completados</span><b id="st-done">0</b></div>
+  <div><span>En proceso</span><b id="st-proc">0</b></div>
+  <div><span>Velocidad</span><b id="st-speed">—</b></div>
+  <div><span>Ahorro total</span><b id="st-save">—</b></div>
+  <div><span>Tiempo restante</span><b id="st-eta">—</b></div>
+</div>
+
+<!-- MODAL PREVIEW -->
+<div id="modal" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modal-title"></h3>
+      <button class="btn btn-sm" id="modal-dl">⬇ Descargar</button>
+      <button class="btn btn-sm" id="modal-close">✕ Cerrar</button>
+    </div>
+    <div class="compare">
+      <div class="pane"><h5>ORIGINAL (WEBP)</h5><div id="pane-orig"></div><div class="sz" id="sz-orig"></div></div>
+      <div class="pane"><h5 id="pane-res-title">RESULTADO</h5><div id="pane-res"></div><div class="sz" id="sz-res"></div></div>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+/* ============================================================
+   WEBP FORGE — CORE (funciones puras, testeables en Node)
+   Detección binaria WebP, encoder GIF (median-cut + LZW),
+   encoder BMP 24-bit y generador ZIP (modo store + CRC32).
+   ============================================================ */
+
+// ---------- Lectura de headers WebP (contenedor RIFF) ----------
+function readFourCC(view, off) {
+  return String.fromCharCode(view.getUint8(off), view.getUint8(off + 1), view.getUint8(off + 2), view.getUint8(off + 3));
+}
+
+/**
+ * Analiza los bytes del archivo y detecta el tipo real de WebP.
+ * VP8  -> lossy estático | VP8L -> lossless estático | VP8X -> extendido (posible animación).
+ * Para VP8X se recorren los chunks RIFF para contar frames ANMF y sumar duración.
+ */
+function parseWebP(buffer, fullSize) {
+  const view = new DataView(buffer);
+  const total = fullSize || buffer.byteLength; // permite analizar solo el header con el tamaño real conocido
+  if (buffer.byteLength < 30) return { valid: false, reason: 'Archivo demasiado pequeño para ser un WebP válido' };
+  if (readFourCC(view, 0) !== 'RIFF') return { valid: false, reason: 'Firma RIFF ausente — no es un contenedor RIFF' };
+  if (readFourCC(view, 8) !== 'WEBP') return { valid: false, reason: 'Firma WEBP ausente — es RIFF pero no WebP' };
+  const riffSize = view.getUint32(4, true);
+  // RIFF declara tamaño - 8; toleramos truncado leve pero lo reportamos
+  const truncated = (riffSize + 8) > total + 1;
+
+  const chunk = readFourCC(view, 12);
+  const info = {
+    valid: true, truncated, chunk, type: '?', animated: false, frames: 1,
+    width: 0, height: 0, hasAlpha: false, hasICC: false, hasEXIF: false, hasXMP: false,
+    loopCount: 0, durationMs: 0
+  };
+
+  if (chunk === 'VP8 ') {
+    info.type = 'lossy';
+    // Payload en 20: frame tag 3B + start code 9D 01 2A + width/height uint16 LE (14 bits útiles)
+    if (view.getUint8(23) === 0x9D && view.getUint8(24) === 0x01 && view.getUint8(25) === 0x2A) {
+      info.width = view.getUint16(26, true) & 0x3FFF;
+      info.height = view.getUint16(28, true) & 0x3FFF;
+    }
+  } else if (chunk === 'VP8L') {
+    if (view.getUint8(20) !== 0x2F) return { valid: false, reason: 'Chunk VP8L sin firma 0x2F — archivo corrupto' };
+    info.type = 'lossless';
+    // Bitstream LE: 14 bits width-1, 14 bits height-1, 1 bit alpha
+    const b = view.getUint32(21, true);
+    info.width = (b & 0x3FFF) + 1;
+    info.height = ((b >>> 14) & 0x3FFF) + 1;
+    info.hasAlpha = ((b >>> 28) & 1) === 1;
+  } else if (chunk === 'VP8X') {
+    info.type = 'extended';
+    const flags = view.getUint8(20);
+    info.animated = (flags & 0x02) !== 0;
+    info.hasXMP  = (flags & 0x04) !== 0;
+    info.hasEXIF = (flags & 0x08) !== 0;
+    info.hasAlpha = (flags & 0x10) !== 0;
+    info.hasICC  = (flags & 0x20) !== 0;
+    // Canvas size: 24 bits LE cada uno, valor-1
+    info.width  = 1 + (view.getUint8(24) | (view.getUint8(25) << 8) | (view.getUint8(26) << 16));
+    info.height = 1 + (view.getUint8(27) | (view.getUint8(28) << 8) | (view.getUint8(29) << 16));
+    // Recorrer chunks: contar ANMF (frames) y leer ANIM (loop count)
+    let off = 12, frames = 0, dur = 0;
+    while (off + 8 <= buffer.byteLength) {
+      const fcc = readFourCC(view, off);
+      const size = view.getUint32(off + 4, true);
+      if (fcc === 'ANMF' && off + 8 + 16 <= buffer.byteLength) {
+        frames++;
+        // Duración del frame: 24 bits LE en payload offset 12
+        dur += view.getUint8(off + 8 + 12) | (view.getUint8(off + 8 + 13) << 8) | (view.getUint8(off + 8 + 14) << 16);
+      } else if (fcc === 'ANIM' && off + 8 + 6 <= buffer.byteLength) {
+        info.loopCount = view.getUint16(off + 8 + 4, true);
+      }
+      off += 8 + size + (size & 1); // chunks RIFF alineados a 2 bytes
+    }
+    if (info.animated) { info.frames = Math.max(frames, 1); info.durationMs = dur; }
+  } else {
+    return { valid: false, reason: `Chunk desconocido "${chunk}" — WebP corrupto o variante no soportada` };
+  }
+  if (info.width <= 0 || info.height <= 0) return { valid: false, reason: 'Dimensiones inválidas en el header' };
+  return info;
+}
+
+// ---------- Detección de contenedor (WebP / WebM / MP4) ----------
+/**
+ * Identifica el contenedor real leyendo los magic bytes:
+ * RIFF+WEBP -> webp | EBML 1A45DFA3 + DocType -> webm/mkv | box "ftyp" -> mp4
+ */
+function detectContainer(buffer) {
+  if (buffer.byteLength < 12) return 'unknown';
+  const view = new DataView(buffer);
+  if (readFourCC(view, 0) === 'RIFF' && readFourCC(view, 8) === 'WEBP') return 'webp';
+  if (view.getUint32(0) === 0x1A45DFA3) {
+    // Buscar el elemento DocType (ID 0x4282) en la cabecera EBML
+    const lim = Math.min(buffer.byteLength, 4096);
+    const b = new Uint8Array(buffer, 0, lim);
+    for (let i = 0; i < lim - 3; i++) {
+      if (b[i] === 0x42 && b[i + 1] === 0x82) {
+        const len = b[i + 2] & 0x7F; // longitud EBML de 1 byte (suficiente para "webm"/"matroska")
+        const doc = String.fromCharCode(...b.slice(i + 3, i + 3 + len));
+        if (doc === 'webm') return 'webm';
+        if (doc === 'matroska') return 'mkv';
+        break;
+      }
+    }
+    return 'mkv';
+  }
+  if (readFourCC(view, 4) === 'ftyp') return 'mp4';
+  return 'unknown';
+}
+
+// ---------- Cuantización de color (median cut) ----------
+/**
+ * Reduce RGBA a una paleta de hasta maxColors usando median-cut.
+ * Devuelve { palette: Uint8Array(n*3), indices: Uint8Array(npix), transparentIndex }
+ * Si hay píxeles con alpha<128 se reserva un índice transparente.
+ */
+function quantize(rgba, maxColors) {
+  const npix = rgba.length >>> 2;
+  let hasTransparent = false;
+  for (let i = 3; i < rgba.length; i += 4) { if (rgba[i] < 128) { hasTransparent = true; break; } }
+  const palMax = hasTransparent ? maxColors - 1 : maxColors;
+
+  // Muestreo (máx ~32768 px) para construir la paleta
+  const step = Math.max(1, Math.floor(npix / 32768));
+  const samples = [];
+  for (let i = 0; i < npix; i += step) {
+    const o = i << 2;
+    if (rgba[o + 3] >= 128) samples.push([rgba[o], rgba[o + 1], rgba[o + 2]]);
+  }
+  if (samples.length === 0) samples.push([0, 0, 0]);
+
+  // Median cut
+  let boxes = [samples];
+  while (boxes.length < palMax) {
+    // elegir caja con mayor rango de canal
+    let bi = -1, bRange = -1, bChan = 0;
+    for (let b = 0; b < boxes.length; b++) {
+      const box = boxes[b];
+      if (box.length < 2) continue;
+      for (let c = 0; c < 3; c++) {
+        let mn = 255, mx = 0;
+        for (let s = 0; s < box.length; s++) { const v = box[s][c]; if (v < mn) mn = v; if (v > mx) mx = v; }
+        const r = mx - mn;
+        if (r > bRange) { bRange = r; bi = b; bChan = c; }
+      }
+    }
+    if (bi < 0 || bRange === 0) break;
+    const box = boxes[bi];
+    box.sort((a, b) => a[bChan] - b[bChan]);
+    const mid = box.length >> 1;
+    boxes.splice(bi, 1, box.slice(0, mid), box.slice(mid));
+  }
+
+  const n = boxes.length;
+  const palette = new Uint8Array((hasTransparent ? n + 1 : n) * 3);
+  for (let b = 0; b < n; b++) {
+    const box = boxes[b];
+    let r = 0, g = 0, bl = 0;
+    for (let s = 0; s < box.length; s++) { r += box[s][0]; g += box[s][1]; bl += box[s][2]; }
+    palette[b * 3] = Math.round(r / box.length);
+    palette[b * 3 + 1] = Math.round(g / box.length);
+    palette[b * 3 + 2] = Math.round(bl / box.length);
+  }
+  const transparentIndex = hasTransparent ? n : -1; // entrada extra (negro) al final
+
+  // Mapear todos los píxeles con caché por color reducido a 15 bits
+  const cache = new Map();
+  const indices = new Uint8Array(npix);
+  for (let i = 0; i < npix; i++) {
+    const o = i << 2;
+    if (hasTransparent && rgba[o + 3] < 128) { indices[i] = transparentIndex; continue; }
+    const key = ((rgba[o] >> 3) << 10) | ((rgba[o + 1] >> 3) << 5) | (rgba[o + 2] >> 3);
+    let idx = cache.get(key);
+    if (idx === undefined) {
+      let best = 0, bd = Infinity;
+      for (let p = 0; p < n; p++) {
+        const dr = rgba[o] - palette[p * 3], dg = rgba[o + 1] - palette[p * 3 + 1], db = rgba[o + 2] - palette[p * 3 + 2];
+        const d = dr * dr + dg * dg + db * db;
+        if (d < bd) { bd = d; best = p; }
+      }
+      idx = best; cache.set(key, idx);
+    }
+    indices[i] = idx;
+  }
+  return { palette, paletteCount: hasTransparent ? n + 1 : n, indices, transparentIndex };
+}
+
+// ---------- LZW (GIF) ----------
+function lzwEncode(indices, minCodeSize, out) {
+  const CLEAR = 1 << minCodeSize, EOI = CLEAR + 1;
+  let codeSize = minCodeSize + 1, next = EOI + 1;
+  let dict = new Map();
+  let cur = 0, curBits = 0;
+  const bytes = [];
+  const emit = (code) => {
+    cur |= code << curBits; curBits += codeSize;
+    while (curBits >= 8) { bytes.push(cur & 0xFF); cur >>>= 8; curBits -= 8; }
+  };
+  emit(CLEAR);
+  let prefix = indices[0];
+  for (let i = 1; i < indices.length; i++) {
+    const k = indices[i];
+    const key = (prefix << 8) | k;
+    const found = dict.get(key);
+    if (found !== undefined) { prefix = found; continue; }
+    emit(prefix);
+    dict.set(key, next++);
+    if (next === (1 << codeSize) + 1 && codeSize < 12) codeSize++;
+    if (next >= 4096) { emit(CLEAR); dict = new Map(); next = EOI + 1; codeSize = minCodeSize + 1; }
+    prefix = k;
+  }
+  emit(prefix); emit(EOI);
+  if (curBits > 0) bytes.push(cur & 0xFF);
+  // Sub-bloques de máx 255 bytes
+  for (let i = 0; i < bytes.length; i += 255) {
+    const len = Math.min(255, bytes.length - i);
+    out.push(len);
+    for (let j = 0; j < len; j++) out.push(bytes[i + j]);
+  }
+  out.push(0); // terminador de bloques
+}
+
+/**
+ * Construye un GIF89a completo (animado o estático) con paleta local por frame.
+ * frames: [{ data: Uint8ClampedArray|Uint8Array (RGBA), delayMs }]
+ * onProgress(iFrame, total) opcional.
+ */
+function buildGifBuffer(frames, width, height, loopCount, onProgress) {
+  const out = [];
+  const pushStr = (s) => { for (let i = 0; i < s.length; i++) out.push(s.charCodeAt(i)); };
+  const push16 = (v) => { out.push(v & 0xFF, (v >> 8) & 0xFF); };
+
+  pushStr('GIF89a');
+  push16(width); push16(height);
+  out.push(0x70, 0, 0); // sin GCT (paletas locales), color res 8 bits
+
+  if (frames.length > 1) {
+    // NETSCAPE 2.0 loop extension (0 = infinito)
+    pushStr('\x21\xFF\x0BNETSCAPE2.0\x03\x01');
+    push16(loopCount === undefined ? 0 : loopCount);
+    out.push(0);
+  }
+
+  for (let f = 0; f < frames.length; f++) {
+    const { palette, paletteCount, indices, transparentIndex } = quantize(frames[f].data, 256);
+    // Tamaño de tabla: potencia de 2 >= paletteCount, mínimo 4 (GIF exige >=2 bits reales con minCodeSize>=2)
+    let bits = 2;
+    while ((1 << bits) < paletteCount) bits++;
+    const tableSize = 1 << bits;
+
+    // Graphic Control Extension
+    const delay = Math.max(2, Math.round((frames[f].delayMs || 100) / 10)); // centisegundos, mín 20ms
+    const hasT = transparentIndex >= 0;
+    out.push(0x21, 0xF9, 4);
+    out.push((1 << 2) /* disposal=1: no disponer; frames ya vienen compuestos */ | (hasT ? 1 : 0));
+    push16(frames.length > 1 ? delay : 0);
+    out.push(hasT ? transparentIndex : 0, 0);
+
+    // Image Descriptor + Local Color Table
+    out.push(0x2C); push16(0); push16(0); push16(width); push16(height);
+    out.push(0x80 | (bits - 1)); // LCT flag + tamaño
+    for (let i = 0; i < tableSize * 3; i++) out.push(i < palette.length ? palette[i] : 0);
+
+    const minCodeSize = Math.max(2, bits);
+    out.push(minCodeSize);
+    lzwEncode(indices, minCodeSize, out);
+    if (onProgress) onProgress(f + 1, frames.length);
+  }
+  out.push(0x3B);
+  return new Uint8Array(out);
+}
+
+// ---------- BMP 24-bit ----------
+function encodeBMP(rgba, width, height) {
+  // Compone alpha sobre blanco (BMP 24bpp no tiene canal alpha)
+  const rowSize = (3 * width + 3) & ~3;
+  const dataSize = rowSize * height;
+  const buf = new ArrayBuffer(54 + dataSize);
+  const v = new DataView(buf);
+  v.setUint8(0, 0x42); v.setUint8(1, 0x4D);          // "BM"
+  v.setUint32(2, 54 + dataSize, true);
+  v.setUint32(10, 54, true);
+  v.setUint32(14, 40, true);                          // BITMAPINFOHEADER
+  v.setInt32(18, width, true); v.setInt32(22, height, true);
+  v.setUint16(26, 1, true); v.setUint16(28, 24, true);
+  v.setUint32(34, dataSize, true);
+  v.setUint32(38, 2835, true); v.setUint32(42, 2835, true); // 72 DPI
+  const px = new Uint8Array(buf, 54);
+  for (let y = 0; y < height; y++) {
+    const srcRow = (height - 1 - y) * width;          // BMP es bottom-up
+    let o = y * rowSize;
+    for (let x = 0; x < width; x++) {
+      const s = (srcRow + x) << 2;
+      const a = rgba[s + 3] / 255, ia = 1 - a;
+      px[o++] = Math.round(rgba[s + 2] * a + 255 * ia); // B
+      px[o++] = Math.round(rgba[s + 1] * a + 255 * ia); // G
+      px[o++] = Math.round(rgba[s] * a + 255 * ia);     // R
+    }
+  }
+  return new Uint8Array(buf);
+}
+
+// ---------- ZIP (modo store — sin compresión; las imágenes ya están comprimidas) ----------
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(data) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < data.length; i++) c = CRC_TABLE[(c ^ data[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+/**
+ * Genera un ZIP válido en modo store. entries: [{ name, data: Uint8Array }]
+ * Store (no deflate) es la decisión correcta: JPG/PNG/GIF/MP4 ya están comprimidos
+ * y recomprimirlos solo gasta CPU sin reducir tamaño.
+ */
+function buildZip(entries, onProgress) {
+  const encoder = new TextEncoder();
+  const parts = [], central = [];
+  let offset = 0;
+  const now = new Date();
+  const dosTime = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) & 0xFFFF;
+  const dosDate = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xFFFF;
+
+  entries.forEach((e, idx) => {
+    const nameBytes = encoder.encode(e.name);
+    const crc = crc32(e.data);
+    const lh = new ArrayBuffer(30);
+    const v = new DataView(lh);
+    v.setUint32(0, 0x04034b50, true);
+    v.setUint16(4, 20, true);
+    v.setUint16(6, 0x0800, true);      // UTF-8 flag
+    v.setUint16(8, 0, true);           // store
+    v.setUint16(10, dosTime, true); v.setUint16(12, dosDate, true);
+    v.setUint32(14, crc, true);
+    v.setUint32(18, e.data.length, true); v.setUint32(22, e.data.length, true);
+    v.setUint16(26, nameBytes.length, true); v.setUint16(28, 0, true);
+    parts.push(new Uint8Array(lh), nameBytes, e.data);
+
+    const ch = new ArrayBuffer(46);
+    const c = new DataView(ch);
+    c.setUint32(0, 0x02014b50, true);
+    c.setUint16(4, 20, true); c.setUint16(6, 20, true);
+    c.setUint16(8, 0x0800, true); c.setUint16(10, 0, true);
+    c.setUint16(12, dosTime, true); c.setUint16(14, dosDate, true);
+    c.setUint32(16, crc, true);
+    c.setUint32(20, e.data.length, true); c.setUint32(24, e.data.length, true);
+    c.setUint16(28, nameBytes.length, true);
+    c.setUint32(42, offset, true);
+    central.push(new Uint8Array(ch), nameBytes);
+
+    offset += 30 + nameBytes.length + e.data.length;
+    if (onProgress) onProgress(idx + 1, entries.length);
+  });
+
+  let centralSize = 0;
+  central.forEach(p => centralSize += p.length);
+  const eocd = new ArrayBuffer(22);
+  const ev = new DataView(eocd);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, entries.length, true); ev.setUint16(10, entries.length, true);
+  ev.setUint32(12, centralSize, true); ev.setUint32(16, offset, true);
+
+  const total = offset + centralSize + 22;
+  const result = new Uint8Array(total);
+  let pos = 0;
+  for (const p of parts) { result.set(p, pos); pos += p.length; }
+  for (const p of central) { result.set(p, pos); pos += p.length; }
+  result.set(new Uint8Array(eocd), pos);
+  return result;
+}
+
+
+/* ============================================================
+   WEBP FORGE — APP v1.1 (UI, pipeline de conversión, cola, ZIP)
+   Entradas: WebP (estático/animado), WebM, MP4
+   ============================================================ */
+
+// ---------- Capacidades del navegador ----------
+const CAP = {
+  canvas: !!document.createElement('canvas').getContext,
+  offscreen: typeof OffscreenCanvas !== 'undefined',
+  imageDecoder: typeof ImageDecoder !== 'undefined',
+  webcodecs: typeof VideoEncoder !== 'undefined',
+  mediaRecorder: typeof MediaRecorder !== 'undefined',
+  worker: typeof Worker !== 'undefined',
+  captureStream: typeof HTMLVideoElement !== 'undefined' && (HTMLVideoElement.prototype.captureStream || HTMLVideoElement.prototype.mozCaptureStream),
+  mp4: false, webm: false, mp4Mime: '', webmMime: '', mp4AudioMime: '', webmAudioMime: ''
+};
+if (CAP.mediaRecorder) {
+  for (const m of ['video/mp4;codecs="avc1.42E01E"', 'video/mp4;codecs=avc1', 'video/mp4']) {
+    if (MediaRecorder.isTypeSupported(m)) { CAP.mp4 = true; CAP.mp4Mime = m; break; }
+  }
+  for (const m of ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']) {
+    if (MediaRecorder.isTypeSupported(m)) { CAP.webm = true; CAP.webmMime = m; break; }
+  }
+  // Variantes con audio para re-codificar videos conservando la pista de sonido
+  for (const m of ['video/mp4;codecs="avc1.42E01E,mp4a.40.2"', 'video/mp4']) {
+    if (MediaRecorder.isTypeSupported(m)) { CAP.mp4AudioMime = m; break; }
+  }
+  for (const m of ['video/webm;codecs="vp9,opus"', 'video/webm;codecs="vp8,opus"', 'video/webm']) {
+    if (MediaRecorder.isTypeSupported(m)) { CAP.webmAudioMime = m; break; }
+  }
+}
+
+// ---------- Estado ----------
+const FILES = new Map();      // id -> entry
+let nextId = 1;
+let activeFilter = 'all';
+let searchTerm = '';
+let queueRunning = false;
+const sessionPrefs = { format: '', quality: 80 }; // solo en memoria (privacidad)
+const stats = { startedAt: 0, batchDone: 0, batchTotal: 0, times: [] };
+
+// ---------- Helpers ----------
+const $ = (s, el) => (el || document).querySelector(s);
+const $$ = (s, el) => [...(el || document).querySelectorAll(s)];
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const raf = () => new Promise(r => requestAnimationFrame(r));
+function humanSize(b) {
+  if (b == null) return '—';
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  if (b < 1073741824) return (b / 1048576).toFixed(2) + ' MB';
+  return (b / 1073741824).toFixed(2) + ' GB';
+}
+function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(msg, kind, ms) {
+  const t = document.createElement('div');
+  t.className = 'toast' + (kind ? ' ' + kind : '');
+  t.innerHTML = msg;
+  $('#toasts').appendChild(t);
+  setTimeout(() => { t.classList.add('fade-out'); setTimeout(() => t.remove(), 450); }, ms || 3800);
+}
+
+// ---------- Chips de estado de APIs ----------
+(function renderApiChips() {
+  const chips = [
+    ['Canvas', CAP.canvas, 'Canvas API — render y exportación de frames'],
+    ['ImageDecoder', CAP.imageDecoder, 'Decodificación frame a frame de WebP animados (Chrome/Edge 94+)'],
+    ['WebCodecs', CAP.webcodecs, 'VideoEncoder disponible'],
+    ['MP4', CAP.mp4, CAP.mp4 ? 'MediaRecorder puede grabar MP4/H.264' : 'Este navegador no graba MP4 — se usará WebM como fallback'],
+    ['WebM', CAP.webm, 'MediaRecorder puede grabar WebM (VP8/VP9)'],
+  ];
+  $('#api-status').innerHTML = chips.map(([n, ok, tip]) =>
+    `<span class="chip ${ok ? 'on' : 'off'}" title="${escapeHtml(tip)}">${ok ? '✓' : '✗'} ${n}</span>`).join('');
+  if (!CAP.imageDecoder) toast('⚠ Este navegador no soporta <b>ImageDecoder</b>: los WebP animados solo se convertirán usando su primer frame. Usa Chrome o Edge para animaciones completas.', 'warn', 9000);
+})();
+
+// ---------- Ingesta de archivos ----------
+const ACCEPT_RE = /\.(webp|webm|mp4|m4v)$/i;
+const ACCEPT_TYPES = ['image/webp', 'video/webm', 'video/mp4'];
+
+async function entriesFromDataTransfer(dt) {
+  const out = [];
+  const walkers = [];
+  // IMPORTANTE: leer todos los webkitGetAsEntry/getAsFile de forma SÍNCRONA;
+  // los DataTransferItem se invalidan en cuanto el handler cede el control.
+  if (dt.items && dt.items.length) {
+    for (const it of [...dt.items]) {
+      if (it.kind !== 'file') continue;
+      const entry = it.webkitGetAsEntry ? it.webkitGetAsEntry() : null;
+      if (entry) walkers.push(walkEntry(entry, out));
+      else { const f = it.getAsFile(); if (f) out.push(f); }
+    }
+    await Promise.all(walkers);
+  }
+  // Fallback: algunos entornos no exponen items utilizables pero sí dt.files
+  if (!out.length && dt.files && dt.files.length) out.push(...dt.files);
+  return out;
+}
+async function walkEntry(entry, out) {
+  if (entry.isFile) {
+    const f = await new Promise((res, rej) => entry.file(res, rej)).catch(() => null);
+    if (f) out.push(f);
+  } else if (entry.isDirectory) {
+    const reader = entry.createReader();
+    for (;;) { // readEntries devuelve lotes de máx 100: hay que iterar hasta vaciar
+      const batch = await new Promise((res, rej) => reader.readEntries(res, rej)).catch(() => []);
+      if (!batch.length) break;
+      await Promise.all(batch.map(e => walkEntry(e, out)));
+    }
+  }
+}
+
+// Lee metadatos de un video con un elemento <video> (con timeout de seguridad)
+function probeVideo(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const v = document.createElement('video');
+    const timer = setTimeout(() => { cleanup(); rej(new Error('timeout leyendo metadatos')); }, 15000);
+    const cleanup = () => { clearTimeout(timer); URL.revokeObjectURL(url); v.removeAttribute('src'); v.load(); };
+    v.preload = 'metadata'; v.muted = true;
+    v.onloadedmetadata = () => {
+      const out = { width: v.videoWidth, height: v.videoHeight, durationMs: Math.round((v.duration || 0) * 1000) };
+      cleanup();
+      if (!out.width || !out.height) rej(new Error('el navegador no expone dimensiones de este códec'));
+      else res(out);
+    };
+    v.onerror = () => { cleanup(); rej(new Error('códec no soportado por este navegador')); };
+    v.src = url;
+  });
+}
+
+function defaultFormatFor(entry) {
+  if (sessionPrefs.format) return sessionPrefs.format;
+  const i = entry.info;
+  if (entry.kind === 'video') {
+    // Convertir al "otro" contenedor por defecto; MP4 es lo más universal
+    if (i.type !== 'mp4' && CAP.mp4) return 'mp4';
+    if (i.type === 'mp4' && CAP.webm) return 'webm';
+    return CAP.mp4 ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
+  }
+  if (i.animated) {
+    // Animaciones largas (clasificadas como VIDEO en la UI) → video, no GIF
+    if (i.durationMs > 10000) return CAP.mp4 ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
+    return 'gif';
+  }
+  return 'png';
+}
+
+async function addFiles(fileList) {
+  const all = [...fileList];
+  const accepted = all.filter(f => ACCEPT_RE.test(f.name) || ACCEPT_TYPES.includes(f.type));
+  const skipped = all.length - accepted.length;
+  if (skipped > 0) toast(`Se omitieron <b>${skipped}</b> archivo(s) no soportados (acepto .webp, .webm, .mp4)`, 'warn');
+  if (!accepted.length) { if (!skipped) toast('No se encontraron archivos WebP/WebM/MP4', 'warn'); return; }
+
+  const prog = $('#analyze-progress');
+  prog.style.display = 'block';
+  const frag = document.createDocumentFragment();
+
+  for (let i = 0; i < accepted.length; i++) {
+    const file = accepted[i];
+    prog.textContent = `Analizando ${i + 1} de ${accepted.length} archivos…`;
+    const entry = {
+      id: nextId++, file, name: file.name, size: file.size,
+      kind: 'webp', info: null, selected: true, status: 'ready',
+      format: '', quality: sessionPrefs.quality,
+      blob: null, outName: '', outUrl: null, fallbackNote: '',
+      error: '', errorStack: '', els: null
+    };
+    try {
+      const head = await file.slice(0, 4096).arrayBuffer();
+      const container = detectContainer(head);
+      if (container === 'webp') {
+        entry.kind = 'webp';
+        let info = parseWebP(head, file.size);
+        if (info.valid && info.animated) info = parseWebP(await file.arrayBuffer(), file.size);
+        entry.info = info;
+        if (!info.valid) { entry.status = 'invalid'; entry.error = info.reason; }
+        else entry.format = defaultFormatFor(entry);
+      } else if (container === 'webm' || container === 'mp4' || container === 'mkv') {
+        entry.kind = 'video';
+        try {
+          const m = await probeVideo(file);
+          entry.info = { valid: true, video: true, type: container, animated: true, frames: 0,
+                         width: m.width, height: m.height, durationMs: m.durationMs,
+                         loopCount: 0, hasAlpha: false, hasICC: false, hasEXIF: false, hasXMP: false, truncated: false };
+          entry.format = defaultFormatFor(entry);
+        } catch (err) {
+          entry.status = 'invalid'; entry.info = { valid: false };
+          entry.error = `Video ${container.toUpperCase()} detectado, pero no se puede decodificar: ${err.message}`;
+        }
+      } else {
+        entry.status = 'invalid'; entry.info = { valid: false };
+        entry.error = 'Formato no reconocido: ni WebP (RIFF), ni WebM (EBML), ni MP4 (ftyp)';
+      }
+    } catch (err) {
+      entry.status = 'invalid'; entry.info = { valid: false };
+      entry.error = 'No se pudo leer el archivo: ' + err.message;
+    }
+    if (file.size > 500 * 1048576) toast(`⚠ <b>${escapeHtml(file.name)}</b> pesa ${humanSize(file.size)} — puede agotar la memoria del navegador`, 'warn', 7000);
+    FILES.set(entry.id, entry);
+    frag.appendChild(buildCard(entry));
+    if (i % 20 === 19) await raf(); // no bloquear la UI con lotes grandes
+  }
+  $('#list').appendChild(frag);
+  prog.style.display = 'none';
+  $('#controls').style.display = 'flex';
+  $('#filters').style.display = 'flex';
+  refreshCounters(); applyFilter();
+  toast(`<b>${accepted.length}</b> archivo(s) añadidos`);
+}
+
+// ---------- Tarjetas ----------
+const FORMATS = [['jpg','JPG'],['png','PNG'],['gif','GIF'],['mp4','MP4'],['webm','WebM'],['bmp','BMP']];
+
+function badgeFor(entry) {
+  const i = entry.info;
+  if (!i || !i.valid) return '<span class="badge invalid">⛔ NO VÁLIDO</span>';
+  if (entry.kind === 'video') {
+    return `<span class="badge video">🟠 VIDEO ${i.type.toUpperCase()} · ${(i.durationMs/1000).toFixed(1)}s</span>`;
+  }
+  if (i.animated) {
+    if (i.durationMs > 10000) return `<span class="badge video">🟠 VIDEO · ${i.frames} frames · ${(i.durationMs/1000).toFixed(1)}s</span>`;
+    return `<span class="badge anim">🟣 ANIMADO · ${i.frames} frames</span>`;
+  }
+  return `<span class="badge static">🟦 ${i.type === 'lossy' ? 'LOSSY (VP8)' : i.type === 'lossless' ? 'LOSSLESS (VP8L)' : 'ESTÁTICO (VP8X)'}</span>`;
+}
+function metaFor(entry) {
+  const i = entry.info;
+  let s = `Tamaño: <b>${humanSize(entry.size)}</b>`;
+  if (i && i.valid) {
+    s += ` &nbsp;|&nbsp; <b>${i.width}×${i.height}</b>`;
+    if (entry.kind === 'video') s += ` &nbsp;|&nbsp; <b>${(i.durationMs/1000).toFixed(2)}s</b> de video`;
+    else if (i.animated) s += ` &nbsp;|&nbsp; <b>${i.frames}</b> frames · ${(i.durationMs/1000).toFixed(2)}s · loop ${i.loopCount === 0 ? '∞' : i.loopCount}`;
+    const extra = [i.hasAlpha && 'alpha', i.hasICC && 'ICC', i.hasEXIF && 'EXIF', i.hasXMP && 'XMP'].filter(Boolean);
+    if (extra.length) s += ` &nbsp;|&nbsp; ${extra.join(' · ')}`;
+    if (i.truncated) s += ' &nbsp;|&nbsp; <span style="color:var(--warn)">⚠ truncado</span>';
+  }
+  return s;
+}
+
+function buildCard(entry) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.dataset.id = entry.id;
+  const invalid = entry.status === 'invalid';
+  card.innerHTML = `
+    <button class="card-x" data-act="remove" title="Quitar de la lista">✕</button>
+    <div class="card-inner">
+      <input type="checkbox" class="sel-box" data-act="sel" ${entry.selected && !invalid ? 'checked' : ''} ${invalid ? 'disabled' : ''}>
+      <img class="thumb thumb-skel" alt="">
+      <div class="card-body">
+        <div class="card-top"><span class="fname" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>${badgeFor(entry)}</div>
+        <div class="fmeta">${metaFor(entry)}</div>
+        ${invalid ? `<div class="status-line error" style="display:block">⛔ ${escapeHtml(entry.error)}</div>` : `
+        <div class="card-controls">
+          <label style="font-size:12px;color:var(--text-2)">Convertir a:</label>
+          <select class="fmt-select" data-act="fmt">${FORMATS.map(([v, l]) => `<option value="${v}" ${v === entry.format ? 'selected' : ''}>${l}</option>`).join('')}</select>
+          <span class="q-wrap" style="${entry.format === 'jpg' ? '' : 'display:none'}">Calidad <input type="range" min="10" max="100" value="${entry.quality}" data-act="q"> <span class="qv">${entry.quality}%</span></span>
+          <button class="btn btn-sm" data-act="convert">⚙ Convertir</button>
+        </div>
+        <div class="progress-row"><div class="pbar"><div class="pbar-fill"></div></div><span class="ptext"></span></div>
+        <div class="status-line"></div>
+        <div class="result-row">
+          <button class="btn btn-sm btn-ok" data-act="dl">⬇ Descargar</button>
+          <button class="btn btn-sm" data-act="preview">👁 Preview</button>
+          <button class="btn btn-sm" data-act="reconvert">↻ Volver a convertir</button>
+          <span class="savings"></span>
+        </div>`}
+      </div>
+    </div>`;
+  entry.els = {
+    card,
+    thumb: $('.thumb', card),
+    progRow: $('.progress-row', card),
+    pfill: $('.pbar-fill', card),
+    ptext: $('.ptext', card),
+    status: $('.status-line', card),
+    resultRow: $('.result-row', card),
+    savings: $('.savings', card),
+    fmt: $('.fmt-select', card),
+    qwrap: $('.q-wrap', card),
+    convertBtn: $('[data-act=convert]', card),
+    sel: $('.sel-box', card),
+  };
+  if (invalid) card.classList.add('err-card');
+  thumbObserver.observe(card);
+  return card;
+}
+
+// Miniaturas perezosas: solo se generan cuando la tarjeta entra al viewport
+const thumbObserver = new IntersectionObserver(async (obs) => {
+  for (const o of obs) {
+    if (!o.isIntersecting) continue;
+    thumbObserver.unobserve(o.target);
+    const entry = FILES.get(+o.target.dataset.id);
+    if (!entry) continue;
+    try {
+      let w, h, draw;
+      if (entry.kind === 'video' && entry.info && entry.info.valid) {
+        const { v, url } = await videoElement(entry);
+        await seekTo(v, Math.min(0.1, (v.duration || 1) / 10));
+        w = v.videoWidth; h = v.videoHeight; draw = v;
+        const s = 74 / Math.max(w, h);
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(h * s));
+        c.getContext('2d').drawImage(draw, 0, 0, c.width, c.height);
+        entry.els.thumb.src = c.toDataURL('image/png');
+        URL.revokeObjectURL(url);
+      } else {
+        const bmp = await createImageBitmap(entry.file); // primer frame del webp
+        const s = 74 / Math.max(bmp.width, bmp.height);
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(bmp.width * s));
+        c.height = Math.max(1, Math.round(bmp.height * s));
+        c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+        bmp.close();
+        entry.els.thumb.src = c.toDataURL('image/png');
+      }
+    } catch { entry.els.thumb.alt = '✕'; }
+    entry.els.thumb.classList.remove('thumb-skel');
+  }
+}, { rootMargin: '200px' });
+
+// ---------- Eventos delegados de la lista ----------
+$('#list').addEventListener('click', (e) => {
+  const act = e.target.dataset.act;
+  if (!act) return;
+  const entry = FILES.get(+e.target.closest('.card').dataset.id);
+  if (!entry) return;
+  if (act === 'remove') removeEntry(entry);
+  else if (act === 'convert' || act === 'reconvert') enqueue([entry]);
+  else if (act === 'dl') downloadEntry(entry);
+  else if (act === 'preview') openPreview(entry);
+});
+$('#list').addEventListener('change', (e) => {
+  const act = e.target.dataset.act;
+  if (!act) return;
+  const entry = FILES.get(+e.target.closest('.card').dataset.id);
+  if (!entry) return;
+  if (act === 'sel') { entry.selected = e.target.checked; entry.els.card.classList.toggle('selected', entry.selected); refreshCounters(); }
+  else if (act === 'fmt') {
+    entry.format = e.target.value;
+    sessionPrefs.format = '';
+    entry.els.qwrap.style.display = entry.format === 'jpg' ? '' : 'none';
+    if ((entry.format === 'mp4' && !CAP.mp4 && CAP.webm)) toast('Este navegador no graba MP4 — se generará <b>WebM</b> como fallback', 'warn');
+  }
+});
+$('#list').addEventListener('input', (e) => {
+  if (e.target.dataset.act !== 'q') return;
+  const entry = FILES.get(+e.target.closest('.card').dataset.id);
+  entry.quality = +e.target.value;
+  sessionPrefs.quality = entry.quality;
+  $('.qv', entry.els.card).textContent = entry.quality + '%';
+});
+
+function removeEntry(entry) {
+  if (entry.outUrl) URL.revokeObjectURL(entry.outUrl);
+  entry.els.card.remove();
+  FILES.delete(entry.id);
+  refreshCounters();
+  if (!FILES.size) { $('#controls').style.display = 'none'; $('#filters').style.display = 'none'; }
+}
+
+// ---------- Decodificación WebP ----------
+async function decodeAllFrames(entry, onProg, firstOnly) {
+  const buf = await entry.file.arrayBuffer();
+  if (CAP.imageDecoder) {
+    const dec = new ImageDecoder({ data: buf, type: 'image/webp' });
+    await dec.tracks.ready;
+    const track = dec.tracks.selectedTrack;
+    const count = firstOnly ? 1 : (track.frameCount || 1);
+    const frames = [];
+    try {
+      for (let i = 0; i < count; i++) {
+        const { image } = await dec.decode({ frameIndex: i });
+        // duration viene en microsegundos; los WebP sin duración usan 100ms por convención
+        const delayMs = image.duration ? image.duration / 1000 : 100;
+        const bmp = await createImageBitmap(image);
+        image.close();
+        frames.push({ bmp, delayMs });
+        onProg && onProg(`Decodificando frame ${i + 1}/${count}`, 5 + (i + 1) / count * 30);
+        if (i % 5 === 4) await raf();
+      }
+    } finally { dec.close(); }
+    return frames;
+  }
+  // Fallback universal: createImageBitmap decodifica el primer frame
+  const bmp = await createImageBitmap(new Blob([buf], { type: 'image/webp' }));
+  onProg && onProg('Decodificado (primer frame)', 35);
+  return [{ bmp, delayMs: 100 }];
+}
+
+function makeCanvas(w, h) {
+  if (CAP.offscreen) return new OffscreenCanvas(w, h);
+  const c = document.createElement('canvas'); c.width = w; c.height = h; return c;
+}
+async function canvasToBlob(c, type, q) {
+  if (c.convertToBlob) return c.convertToBlob({ type, quality: q });
+  return new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('toBlob devolvió null — formato no soportado')), type, q));
+}
+function imageDataFrom(bmp, w, h) {
+  const c = makeCanvas(w, h);
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(bmp, 0, 0, w, h);
+  return ctx.getImageData(0, 0, w, h);
+}
+
+// ---------- Decodificación de video (WebM/MP4) vía <video> ----------
+async function videoElement(entry) {
+  const url = URL.createObjectURL(entry.file);
+  const v = document.createElement('video');
+  v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = url;
+  await new Promise((res, rej) => {
+    const timer = setTimeout(() => rej(new Error('timeout cargando video')), 20000);
+    v.onloadedmetadata = () => { clearTimeout(timer); res(); };
+    v.onerror = () => { clearTimeout(timer); rej(new Error('no se pudo decodificar el video')); };
+  });
+  return { v, url };
+}
+function seekTo(v, t) {
+  return new Promise((res, rej) => {
+    const timer = setTimeout(() => { v.removeEventListener('seeked', h); rej(new Error('timeout en seek')); }, 10000);
+    const h = () => { clearTimeout(timer); v.removeEventListener('seeked', h); res(); };
+    v.addEventListener('seeked', h);
+    v.currentTime = Math.min(t, Math.max(0, (v.duration || t) - 0.001));
+  });
+}
+
+/**
+ * Extrae frames RGBA de un video por seek (para GIF).
+ * Limita FPS/frames/resolución: un GIF de 1080p×900 frames reventaría la memoria.
+ */
+async function videoFrames(entry, onProg) {
+  const { v, url } = await videoElement(entry);
+  try {
+    const FPS = 10, MAX_FRAMES = 300, MAX_W = 640;
+    const scale = Math.min(1, MAX_W / v.videoWidth);
+    const W = Math.max(2, Math.round(v.videoWidth * scale) & ~1);
+    const H = Math.max(2, Math.round(v.videoHeight * scale) & ~1);
+    const total = Math.min(Math.ceil((v.duration || 0) * FPS), MAX_FRAMES);
+    if (total < 1) throw new Error('duración de video inválida');
+    const c = makeCanvas(W, H);
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    const frames = [];
+    for (let i = 0; i < total; i++) {
+      await seekTo(v, i / FPS);
+      ctx.drawImage(v, 0, 0, W, H);
+      frames.push({ data: ctx.getImageData(0, 0, W, H).data.buffer, delayMs: 1000 / FPS });
+      onProg(`Capturando frame ${i + 1}/${total}`, 5 + (i + 1) / total * 45);
+    }
+    const note = [];
+    if (scale < 1) note.push(`reescalado a ${W}×${H}`);
+    if ((v.duration || 0) * FPS > MAX_FRAMES) note.push(`recortado a ${MAX_FRAMES / FPS}s`);
+    return { frames, W, H, note: note.join(', ') };
+  } finally { URL.revokeObjectURL(url); }
+}
+
+// Primer frame de un video como ImageData (para PNG/JPG/BMP)
+async function videoFirstFrame(entry) {
+  const { v, url } = await videoElement(entry);
+  try {
+    await seekTo(v, 0);
+    const W = v.videoWidth, H = v.videoHeight;
+    const c = makeCanvas(W, H);
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(v, 0, 0);
+    return { imageData: ctx.getImageData(0, 0, W, H), W, H, canvas: c };
+  } finally { URL.revokeObjectURL(url); }
+}
+
+/**
+ * Re-codifica un video a MP4/WebM con MediaRecorder sobre captureStream del
+ * propio <video> (conserva audio y resolución; en tiempo real).
+ */
+async function videoToVideo(entry, wantMp4, onProg) {
+  if (!CAP.mediaRecorder || (!CAP.mp4 && !CAP.webm)) throw new Error('MediaRecorder no está disponible en este navegador');
+  if (!CAP.captureStream) throw new Error('captureStream no está disponible en este navegador');
+  const { v, url } = await videoElement(entry);
+  try {
+    const useMp4 = wantMp4 && CAP.mp4;
+    const ext = useMp4 ? 'mp4' : 'webm';
+    const stream = v.captureStream ? v.captureStream() : v.mozCaptureStream();
+    const hasAudio = stream.getAudioTracks().length > 0;
+    let mime = useMp4 ? (hasAudio && CAP.mp4AudioMime ? CAP.mp4AudioMime : CAP.mp4Mime)
+                      : (hasAudio && CAP.webmAudioMime ? CAP.webmAudioMime : CAP.webmMime);
+    let rec;
+    try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 }); }
+    catch { // códec de audio no soportado → quitar audio y reintentar solo con video
+      stream.getAudioTracks().forEach(t => stream.removeTrack(t));
+      mime = useMp4 ? CAP.mp4Mime : CAP.webmMime;
+      rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+    }
+    const chunks = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    const stopped = new Promise(r => { rec.onstop = r; });
+    rec.start(250);
+    await v.play();
+    await new Promise((res, rej) => {
+      v.onended = res;
+      v.onerror = () => rej(new Error('error reproduciendo el video'));
+      const iv = setInterval(() => {
+        if (v.ended) { clearInterval(iv); return; }
+        onProg(`Re-codificando a ${ext.toUpperCase()} — ${v.currentTime.toFixed(1)}s / ${(v.duration || 0).toFixed(1)}s (tiempo real)`, 5 + (v.currentTime / (v.duration || 1)) * 90);
+      }, 250);
+    });
+    await sleep(150);
+    rec.stop();
+    await stopped;
+    stream.getTracks().forEach(t => t.stop());
+    if (!chunks.length) throw new Error('MediaRecorder no produjo datos — códec posiblemente no soportado');
+    return { blob: new Blob(chunks, { type: mime.split(';')[0] }), ext, fellBack: wantMp4 && !useMp4 };
+  } finally { URL.revokeObjectURL(url); }
+}
+
+// ---------- GIF en Web Worker (no congela la UI) ----------
+let gifWorkerUrl = null;
+function getGifWorkerUrl() {
+  if (gifWorkerUrl) return gifWorkerUrl;
+  const src = [quantize, lzwEncode, buildGifBuffer].map(f => f.toString()).join('\n') + `
+self.onmessage = (e) => {
+  const { frames, width, height, loop } = e.data;
+  try {
+    const fr = frames.map(f => ({ data: new Uint8Array(f.data), delayMs: f.delayMs }));
+    const out = buildGifBuffer(fr, width, height, loop, (i, n) => postMessage({ p: i / n }));
+    postMessage({ done: out.buffer }, [out.buffer]);
+  } catch (err) { postMessage({ error: String((err && err.stack) || err) }); }
+};`;
+  gifWorkerUrl = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+  return gifWorkerUrl;
+}
+function encodeGifInWorker(frames, w, h, loop, onProg) {
+  if (!CAP.worker) { // fallback síncrono (raro)
+    return Promise.resolve(new Blob([buildGifBuffer(frames.map(f => ({ data: new Uint8Array(f.data), delayMs: f.delayMs })), w, h, loop, onProg)], { type: 'image/gif' }));
+  }
+  return new Promise((res, rej) => {
+    const wk = new Worker(getGifWorkerUrl());
+    wk.onmessage = (e) => {
+      if (e.data.p !== undefined) onProg && onProg(e.data.p);
+      else if (e.data.done) { res(new Blob([e.data.done], { type: 'image/gif' })); wk.terminate(); }
+      else if (e.data.error) { rej(new Error(e.data.error)); wk.terminate(); }
+    };
+    wk.onerror = (e) => { rej(new Error(e.message || 'Error en worker GIF')); wk.terminate(); };
+    wk.postMessage({ frames, width: w, height: h, loop }, frames.map(f => f.data));
+  });
+}
+
+// ---------- Video desde frames (WebP animado → MP4/WebM, tiempo real) ----------
+async function framesToVideo(frames, w, h, wantMp4, onProg) {
+  if (!CAP.mediaRecorder || (!CAP.mp4 && !CAP.webm)) throw new Error('MediaRecorder no está disponible en este navegador');
+  const useMp4 = wantMp4 && CAP.mp4;
+  const mime = useMp4 ? CAP.mp4Mime : CAP.webmMime;
+  const ext = useMp4 ? 'mp4' : 'webm';
+  // H.264 exige dimensiones pares
+  const W = Math.max(2, w & ~1), H = Math.max(2, h & ~1);
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+
+  let stream = canvas.captureStream(0);
+  let track = stream.getVideoTracks()[0];
+  const canReq = track && typeof track.requestFrame === 'function';
+  if (!canReq) { stream = canvas.captureStream(30); track = stream.getVideoTracks()[0]; }
+
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+  const chunks = [];
+  rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+  const stopped = new Promise(r => { rec.onstop = r; });
+  rec.start(200);
+
+  // La grabación es en tiempo real: dura lo que dura la animación (limitación de MediaRecorder)
+  const isStatic = frames.length === 1;
+  const total = isStatic ? 3000 : frames.reduce((a, f) => a + Math.max(f.delayMs, 33), 0);
+  let elapsed = 0;
+  for (let i = 0; i < frames.length; i++) {
+    ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(frames[i].bmp, 0, 0, W, H);
+    if (canReq) track.requestFrame();
+    const hold = isStatic ? 3000 : Math.max(frames[i].delayMs, 33);
+    // Para frames largos refrescamos la captura periódicamente
+    let t = 0;
+    while (t < hold) {
+      const step = Math.min(100, hold - t);
+      await sleep(step); t += step; elapsed += step;
+      if (canReq) track.requestFrame();
+      onProg && onProg(`Grabando ${ext.toUpperCase()} — frame ${i + 1}/${frames.length}`, 40 + (elapsed / total) * 55);
+    }
+  }
+  await sleep(150);
+  rec.stop();
+  await stopped;
+  track.stop();
+  if (!chunks.length) throw new Error('MediaRecorder no produjo datos — códec posiblemente no soportado');
+  return { blob: new Blob(chunks, { type: mime.split(';')[0] }), ext, fellBack: wantMp4 && !useMp4 };
+}
+
+// ---------- Pipeline de conversión ----------
+function setProgress(entry, text, pct) {
+  entry.els.progRow.style.display = 'flex';
+  entry.els.ptext.textContent = text;
+  entry.els.pfill.style.width = Math.min(100, Math.round(pct)) + '%';
+}
+function baseName(n) { return n.replace(/\.(webp|webm|mp4|m4v)$/i, ''); }
+
+async function convertEntry(entry) {
+  if (entry.status === 'processing' || entry.status === 'invalid') return;
+  const els = entry.els;
+  entry.status = 'processing';
+  entry.fallbackNote = '';
+  els.card.classList.add('processing');
+  els.card.classList.remove('done-card', 'err-card');
+  els.status.style.display = 'none'; els.status.className = 'status-line';
+  els.resultRow.style.display = 'none';
+  els.convertBtn.disabled = true;
+  if (entry.outUrl) { URL.revokeObjectURL(entry.outUrl); entry.outUrl = null; }
+  refreshCounters(); updateStatsPanel();
+  const t0 = performance.now();
+  let frames = [];
+  try {
+    const fmt = entry.format;
+    let blob, ext = fmt;
+
+    if (entry.kind === 'video') {
+      // ===== Entrada de VIDEO (WebM/MP4) =====
+      if (fmt === 'mp4' || fmt === 'webm') {
+        setProgress(entry, `Re-codificando video (~${(entry.info.durationMs/1000).toFixed(1)}s, tiempo real)…`, 4);
+        const r = await videoToVideo(entry, fmt === 'mp4', (t, p) => setProgress(entry, t, p));
+        blob = r.blob; ext = r.ext;
+        if (r.fellBack) entry.fallbackNote = 'Este navegador no graba MP4: se generó WebM.';
+      } else if (fmt === 'gif') {
+        const r = await videoFrames(entry, (t, p) => setProgress(entry, t, p));
+        setProgress(entry, 'Cuantizando y codificando GIF (LZW)…', 52);
+        blob = await encodeGifInWorker(r.frames, r.W, r.H, 0,
+          (p) => setProgress(entry, `Codificando GIF ${Math.round(p * 100)}% (LZW)`, 52 + p * 45));
+        if (r.note) entry.fallbackNote = 'GIF ' + r.note + ' para controlar memoria y tamaño.';
+      } else { // png / jpg / bmp → primer frame
+        setProgress(entry, `Extrayendo primer frame…`, 30);
+        const r = await videoFirstFrame(entry);
+        setProgress(entry, `Codificando ${fmt.toUpperCase()}…`, 60);
+        if (fmt === 'bmp') blob = new Blob([encodeBMP(r.imageData.data, r.W, r.H)], { type: 'image/bmp' });
+        else {
+          const c = makeCanvas(r.W, r.H);
+          const ctx = c.getContext('2d');
+          if (fmt === 'jpg') { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, r.W, r.H); }
+          ctx.putImageData ? ctx.putImageData(r.imageData, 0, 0) : null;
+          if (fmt === 'jpg') { // putImageData pisa el fondo; recomponer
+            ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, r.W, r.H);
+            ctx.drawImage(r.canvas, 0, 0);
+          }
+          blob = await canvasToBlob(c, fmt === 'png' ? 'image/png' : 'image/jpeg', entry.quality / 100);
+        }
+        entry.fallbackNote = 'Se usó el primer frame del video.';
+      }
+    } else {
+      // ===== Entrada WEBP =====
+      const needAllFrames = (fmt === 'gif' || fmt === 'mp4' || fmt === 'webm') && entry.info.animated;
+      setProgress(entry, 'Leyendo archivo…', 2);
+      frames = await decodeAllFrames(entry, (t, p) => setProgress(entry, t, p), !needAllFrames);
+      if (needAllFrames && frames.length === 1 && entry.info.frames > 1) {
+        entry.fallbackNote = 'Sin ImageDecoder: solo se usó el primer frame.';
+      }
+      const W = frames[0].bmp.width, H = frames[0].bmp.height;
+
+      if (fmt === 'png' || fmt === 'jpg') {
+        setProgress(entry, `Codificando ${fmt.toUpperCase()}…`, 60);
+        const c = makeCanvas(W, H);
+        const ctx = c.getContext('2d');
+        if (fmt === 'jpg') { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, W, H); } // JPG no tiene alpha
+        ctx.drawImage(frames[0].bmp, 0, 0);
+        blob = await canvasToBlob(c, fmt === 'png' ? 'image/png' : 'image/jpeg', entry.quality / 100);
+      } else if (fmt === 'bmp') {
+        setProgress(entry, 'Codificando BMP…', 60);
+        const id = imageDataFrom(frames[0].bmp, W, H);
+        blob = new Blob([encodeBMP(id.data, W, H)], { type: 'image/bmp' });
+      } else if (fmt === 'gif') {
+        // Extraer RGBA de cada frame y delegar cuantización+LZW al worker
+        const payload = [];
+        for (let i = 0; i < frames.length; i++) {
+          setProgress(entry, `Extrayendo píxeles ${i + 1}/${frames.length}`, 36 + (i / frames.length) * 14);
+          const id = imageDataFrom(frames[i].bmp, W, H);
+          payload.push({ data: id.data.buffer, delayMs: frames[i].delayMs });
+          if (i % 4 === 3) await raf();
+        }
+        setProgress(entry, 'Cuantizando y codificando GIF (LZW)…', 52);
+        blob = await encodeGifInWorker(payload, W, H, entry.info.loopCount || 0,
+          (p) => setProgress(entry, `Codificando frame ${Math.round(p * frames.length)}/${frames.length} (LZW)`, 52 + p * 45));
+      } else if (fmt === 'mp4' || fmt === 'webm') {
+        const secs = entry.info.animated ? (frames.reduce((a, f) => a + Math.max(f.delayMs, 33), 0) / 1000).toFixed(1) : 3;
+        setProgress(entry, `Grabando video en tiempo real (~${secs}s)…`, 40);
+        const r = await framesToVideo(frames, W, H, fmt === 'mp4', (t, p) => setProgress(entry, t, p));
+        blob = r.blob; ext = r.ext;
+        if (r.fellBack) entry.fallbackNote = 'Este navegador no graba MP4: se generó WebM (puedes convertirlo a MP4 con cualquier herramienta local).';
+      } else {
+        throw new Error('Formato desconocido: ' + fmt);
+      }
+    }
+
+    entry.blob = blob;
+    entry.outName = baseName(entry.name) + '.' + ext;
+    entry.outUrl = URL.createObjectURL(blob);
+    entry.status = 'done';
+    setProgress(entry, 'Completado', 100);
+    const delta = entry.size - blob.size;
+    const pct = entry.size ? Math.abs(delta / entry.size * 100).toFixed(0) : 0;
+    els.savings.innerHTML = `${humanSize(entry.size)} → <b style="color:var(--text)">${humanSize(blob.size)}</b> ` +
+      (delta >= 0 ? `<span class="pos">(−${pct}%)</span>` : `<span class="neg">(+${pct}%)</span>`);
+    els.status.className = 'status-line ok';
+    els.status.style.display = 'block';
+    els.status.textContent = `✅ ${entry.outName} listo en ${((performance.now() - t0) / 1000).toFixed(1)}s` + (entry.fallbackNote ? ' — ⚠ ' + entry.fallbackNote : '');
+    els.resultRow.style.display = 'flex';
+    els.card.classList.add('done-card');
+    stats.times.push(performance.now() - t0);
+  } catch (err) {
+    entry.status = 'error';
+    entry.error = err.message || String(err);
+    entry.errorStack = err.stack || '';
+    els.progRow.style.display = 'none';
+    els.status.className = 'status-line error';
+    els.status.style.display = 'block';
+    els.status.innerHTML = `⛔ Error: ${escapeHtml(entry.error)} <button class="btn btn-sm" data-act="convert" style="margin-left:8px">↻ Reintentar</button>` +
+      (entry.errorStack ? `<details class="stack"><summary>Detalles técnicos</summary><pre>${escapeHtml(entry.errorStack)}</pre></details>` : '');
+    els.card.classList.add('err-card');
+  } finally {
+    frames.forEach(f => { try { f.bmp.close(); } catch {} });
+    els.card.classList.remove('processing');
+    els.convertBtn.disabled = false;
+    refreshCounters(); applyFilter(); updateStatsPanel();
+  }
+}
+
+// ---------- Cola con concurrencia configurable ----------
+const queue = [];
+async function enqueue(entries) {
+  const fresh = entries.filter(e => e.status !== 'processing' && e.status !== 'invalid' && !queue.includes(e));
+  queue.push(...fresh);
+  if (queueRunning) return;
+  queueRunning = true;
+  stats.startedAt = performance.now(); stats.batchDone = 0; stats.batchTotal = queue.length; stats.times = [];
+  $('#stats').style.display = 'block';
+  const limit = +$('#parallel').value || 4;
+  const workers = Array.from({ length: limit }, async () => {
+    while (queue.length) {
+      const e = queue.shift();
+      stats.batchTotal = Math.max(stats.batchTotal, stats.batchDone + queue.length + 1);
+      await convertEntry(e);
+      stats.batchDone++; updateStatsPanel();
+    }
+  });
+  await Promise.all(workers);
+  queueRunning = false;
+  updateStatsPanel(true);
+  const done = [...FILES.values()].filter(e => e.status === 'done').length;
+  const errs = [...FILES.values()].filter(e => e.status === 'error').length;
+  toast(`🏁 Lote terminado: <b>${done}</b> completados${errs ? `, <b style="color:var(--err)">${errs}</b> con error` : ''}`);
+  notifyDone(done, errs);
+  setTimeout(() => { if (!queueRunning) $('#stats').style.display = 'none'; }, 6000);
+}
+
+function notifyDone(done, errs) {
+  if (!('Notification' in window) || Notification.permission !== 'granted' || !document.hidden) return;
+  try { new Notification('WEBP FORGE', { body: `Conversión terminada: ${done} archivos listos${errs ? `, ${errs} errores` : ''}` }); } catch {}
+}
+
+// ---------- Descargas ----------
+function downloadEntry(entry) {
+  if (!entry.blob) return;
+  const a = document.createElement('a');
+  a.href = entry.outUrl || URL.createObjectURL(entry.blob);
+  a.download = entry.outName;
+  a.click();
+}
+async function downloadZip() {
+  const done = [...FILES.values()].filter(e => e.status === 'done' && e.blob);
+  if (!done.length) return;
+  const btn = $('#btn-zip');
+  btn.disabled = true;
+  const used = new Set();
+  const entries = [];
+  for (let i = 0; i < done.length; i++) {
+    btn.textContent = `📦 Empaquetando ${i + 1}/${done.length}…`;
+    let name = done[i].outName;
+    // evitar nombres duplicados dentro del ZIP
+    if (used.has(name)) { const d = name.lastIndexOf('.'); name = name.slice(0, d) + ` (${done[i].id})` + name.slice(d); }
+    used.add(name);
+    entries.push({ name, data: new Uint8Array(await done[i].blob.arrayBuffer()) });
+    await raf();
+  }
+  btn.textContent = '📦 Generando ZIP…';
+  await raf();
+  const zip = buildZip(entries);
+  const blob = new Blob([zip], { type: 'application/zip' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'webp-forge-convertidos.zip';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+  btn.textContent = '⬇ Descargar todos (ZIP)';
+  btn.disabled = false;
+  toast(`📦 ZIP generado con <b>${entries.length}</b> archivos (${humanSize(blob.size)})`);
+}
+
+// ---------- Preview ----------
+let modalEntry = null;
+function openPreview(entry) {
+  if (!entry.blob) return;
+  modalEntry = entry;
+  $('#modal-title').textContent = entry.name + '  →  ' + entry.outName;
+  const orig = $('#pane-orig'), res = $('#pane-res');
+  orig.innerHTML = ''; res.innerHTML = '';
+  if (entry.kind === 'video') {
+    const ov = document.createElement('video');
+    ov.src = URL.createObjectURL(entry.file); ov.controls = true; ov.loop = true; ov.muted = true;
+    orig.appendChild(ov);
+  } else {
+    const oimg = new Image();
+    oimg.src = URL.createObjectURL(entry.file);
+    orig.appendChild(oimg);
+  }
+  $('#sz-orig').innerHTML = `<b>${humanSize(entry.size)}</b> · ${entry.info.width}×${entry.info.height}${entry.info.animated && entry.kind === 'webp' ? ' · ' + entry.info.frames + ' frames' : ''}`;
+  const isVideo = /\.(mp4|webm)$/.test(entry.outName);
+  $('#pane-res-title').textContent = 'RESULTADO (' + entry.outName.split('.').pop().toUpperCase() + ')';
+  if (isVideo) {
+    const v = document.createElement('video');
+    v.src = entry.outUrl; v.controls = true; v.autoplay = true; v.loop = true; v.muted = true;
+    res.appendChild(v);
+  } else {
+    const im = new Image(); im.src = entry.outUrl; res.appendChild(im);
+  }
+  $('#sz-res').innerHTML = `<b>${humanSize(entry.blob.size)}</b>`;
+  $('#modal').classList.add('open');
+}
+function closeModal() {
+  $('#modal').classList.remove('open');
+  $$('#modal video').forEach(v => { v.pause(); if (v.src.startsWith('blob:') && v.closest('#pane-orig')) URL.revokeObjectURL(v.src); });
+  modalEntry = null;
+}
+$('#modal-close').addEventListener('click', closeModal);
+$('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
+$('#modal-dl').addEventListener('click', () => { if (modalEntry) downloadEntry(modalEntry); });
+
+// ---------- Filtros, búsqueda, contadores ----------
+function entryMatchesFilter(e, f) {
+  switch (f) {
+    case 'all': return true;
+    case 'static': return e.kind === 'webp' && e.info && e.info.valid && !e.info.animated;
+    case 'anim': return e.kind === 'webp' && e.info && e.info.valid && e.info.animated && e.info.durationMs <= 10000;
+    case 'video': return (e.kind === 'video' && e.info && e.info.valid) || (e.kind === 'webp' && e.info && e.info.valid && e.info.animated && e.info.durationMs > 10000);
+    case 'done': return e.status === 'done';
+    case 'error': return e.status === 'error' || e.status === 'invalid';
+  }
+}
+function applyFilter() {
+  let visible = 0;
+  for (const e of FILES.values()) {
+    const show = entryMatchesFilter(e, activeFilter) && (!searchTerm || e.name.toLowerCase().includes(searchTerm));
+    e.els.card.style.display = show ? '' : 'none';
+    if (show) visible++;
+  }
+  $('#empty-filter').style.display = (FILES.size && !visible) ? 'block' : 'none';
+  for (const chip of $$('.filter-chip')) {
+    const n = [...FILES.values()].filter(e => entryMatchesFilter(e, chip.dataset.f)).length;
+    $('.n', chip).textContent = n ? `(${n})` : '';
+  }
+}
+$$('.filter-chip').forEach(c => c.addEventListener('click', () => {
+  $$('.filter-chip').forEach(x => x.classList.remove('active'));
+  c.classList.add('active');
+  activeFilter = c.dataset.f;
+  applyFilter();
+}));
+$('#search').addEventListener('input', (e) => { searchTerm = e.target.value.toLowerCase().trim(); applyFilter(); });
+
+function refreshCounters() {
+  const all = [...FILES.values()];
+  const done = all.filter(e => e.status === 'done').length;
+  const proc = all.filter(e => e.status === 'processing').length;
+  $('#global-counter').innerHTML = `<b>${all.length}</b> archivos &nbsp;|&nbsp; <b>${done}</b> completados &nbsp;|&nbsp; <b>${proc}</b> procesando`;
+  $('#btn-zip').disabled = !done;
+  const sel = all.filter(e => e.selected && e.status !== 'invalid').length;
+  $('#btn-selall').textContent = (sel === all.filter(e => e.status !== 'invalid').length && sel > 0) ? 'Deseleccionar todo' : 'Seleccionar todo';
+}
+function updateStatsPanel(final) {
+  const all = [...FILES.values()];
+  $('#st-done').textContent = stats.batchDone + '/' + stats.batchTotal;
+  $('#st-proc').textContent = all.filter(e => e.status === 'processing').length;
+  const elapsedMin = (performance.now() - stats.startedAt) / 60000;
+  $('#st-speed').textContent = stats.batchDone && elapsedMin > 0 ? (stats.batchDone / elapsedMin).toFixed(1) + '/min' : '—';
+  const saved = all.filter(e => e.status === 'done').reduce((a, e) => a + (e.size - e.blob.size), 0);
+  $('#st-save').textContent = (saved >= 0 ? '−' : '+') + humanSize(Math.abs(saved));
+  if (final) { $('#st-eta').textContent = '✓ terminado'; return; }
+  const avg = stats.times.length ? stats.times.reduce((a, b) => a + b, 0) / stats.times.length : 0;
+  const remaining = stats.batchTotal - stats.batchDone;
+  $('#st-eta').textContent = avg && remaining ? Math.ceil(avg * remaining / +$('#parallel').value / 1000) + 's' : '—';
+}
+
+// ---------- Controles globales ----------
+$('#btn-selall').addEventListener('click', () => {
+  const valid = [...FILES.values()].filter(e => e.status !== 'invalid');
+  const allSel = valid.every(e => e.selected) && valid.length > 0;
+  valid.forEach(e => { e.selected = !allSel; e.els.sel.checked = !allSel; e.els.card.classList.toggle('selected', !allSel); });
+  refreshCounters();
+});
+$('#global-format').addEventListener('change', (e) => {
+  const f = e.target.value;
+  if (!f) return;
+  sessionPrefs.format = f;
+  for (const en of FILES.values()) {
+    if (en.status === 'invalid' || !en.selected) continue;
+    en.format = f;
+    if (en.els.fmt) en.els.fmt.value = f;
+    if (en.els.qwrap) en.els.qwrap.style.display = f === 'jpg' ? '' : 'none';
+  }
+  if (f === 'mp4' && !CAP.mp4 && CAP.webm) toast('Este navegador no graba MP4 — se generará <b>WebM</b> como fallback', 'warn');
+});
+$('#btn-convert').addEventListener('click', () => {
+  if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
+  const sel = [...FILES.values()].filter(e => e.selected && e.status !== 'invalid');
+  if (!sel.length) { toast('No hay archivos seleccionados', 'warn'); return; }
+  enqueue(sel);
+});
+$('#btn-zip').addEventListener('click', downloadZip);
+$('#btn-clear').addEventListener('click', () => {
+  for (const e of [...FILES.values()]) removeEntry(e);
+});
+
+// ---------- Drop zone ----------
+const dz = $('#dropzone');
+dz.addEventListener('click', (e) => { if (e.target === dz || e.target.closest('.dz-icon, h2, p')) $('#file-input').click(); });
+$('#btn-pick').addEventListener('click', (e) => { e.stopPropagation(); $('#file-input').click(); });
+$('#btn-pick-dir').addEventListener('click', (e) => { e.stopPropagation(); $('#dir-input').click(); });
+$('#file-input').addEventListener('change', (e) => { addFiles(e.target.files); e.target.value = ''; });
+$('#dir-input').addEventListener('change', (e) => { addFiles(e.target.files); e.target.value = ''; });
+
+// Manejo de arrastre a nivel de documento (soltar en cualquier parte de la página)
+let dragDepth = 0;
+document.addEventListener('dragenter', (e) => { e.preventDefault(); dragDepth++; dz.classList.add('drag'); });
+document.addEventListener('dragover', (e) => {
+  e.preventDefault(); // imprescindible: sin esto el navegador NO permite el drop
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+  dz.classList.add('drag');
+});
+document.addEventListener('dragleave', (e) => {
+  e.preventDefault(); dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) dz.classList.remove('drag');
+});
+async function handleDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  dragDepth = 0;
+  dz.classList.remove('drag');
+  if (!e.dataTransfer) return;
+  try {
+    const files = await entriesFromDataTransfer(e.dataTransfer);
+    if (files.length) addFiles(files);
+    else toast('No se detectaron archivos en el arrastre', 'warn');
+  } catch (err) {
+    toast('Error procesando el arrastre: ' + escapeHtml(err.message), 'err');
+  }
+}
+document.addEventListener('drop', handleDrop);
+dz.addEventListener('drop', handleDrop); // redundante a propósito: garantiza captura en la zona
+
+// ---------- Atajos de teclado ----------
+document.addEventListener('keydown', (e) => {
+  const inInput = /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName) && document.activeElement.type !== 'checkbox';
+  if (e.key === 'Escape') { closeModal(); return; }
+  if (inInput) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); $('#btn-selall').click(); }
+  else if (e.key === 'Enter' && FILES.size) { e.preventDefault(); $('#btn-convert').click(); }
+  else if (e.key === ' ' && FILES.size) {
+    const first = [...FILES.values()].find(x => x.selected && x.status === 'done');
+    if (first) { e.preventDefault(); openPreview(first); }
+  }
+});
+
+// Liberar recursos al cerrar
+window.addEventListener('beforeunload', () => {
+  for (const e of FILES.values()) if (e.outUrl) URL.revokeObjectURL(e.outUrl);
+});
+
+// Hook de depuración/integración (consola): window.WEBPFORGE
+window.WEBPFORGE = { version: '1.1.0', FILES, CAP, addFiles, parseWebP, detectContainer };
+
+</script>
+
+<!-- ============================================================
+NOTAS DEL DESARROLLADOR — WEBP FORGE
+================================================================
+
+MEJORAS AÑADIDAS POR INICIATIVA PROPIA
+- Análisis de header en 2 fases: primero solo 64 bytes (instantáneo incluso
+  con cientos de archivos); el escaneo completo de chunks RIFF solo se hace
+  si el VP8X tiene flag de animación (para contar frames ANMF y duración).
+- Metadatos extra detectados desde el binario: canal alpha, perfiles ICC,
+  EXIF y XMP (flags del chunk VP8X / bit alpha del bitstream VP8L), loop
+  count del chunk ANIM y aviso de archivo truncado (RIFF size vs tamaño real).
+- Detección de corrupción ANTES de convertir: firma RIFF/WEBP, firma 0x2F de
+  VP8L, start code 9D 01 2A de VP8 y dimensiones válidas.
+- Miniaturas perezosas con IntersectionObserver: con 500 tarjetas solo se
+  decodifican las visibles (+margen de 200px), el resto muestra skeleton.
+- Encoder GIF propio (median-cut 255 colores + índice transparente + LZW)
+  ejecutado en un Web Worker construido desde Blob URL: la cuantización de
+  un GIF grande no congela la UI. El worker se genera serializando las
+  mismas funciones testeadas (una sola fuente de verdad).
+- ZIP en modo "store" a propósito: JPG/PNG/GIF/MP4 ya están comprimidos;
+  deflate solo quemaría CPU. CRC32 implementado con tabla precalculada y
+  flag UTF-8 para nombres con ñ/espacios/acentos.
+- Cola de conversión con concurrencia configurable (1/2/4/6) + panel de
+  estadísticas en vivo (velocidad, ahorro de espacio, ETA).
+- Nombres duplicados dentro del ZIP se desambiguan automáticamente.
+- Liberación de memoria: ImageBitmaps cerrados tras cada conversión,
+  ObjectURLs revocados al reconvertir/quitar/cerrar la página.
+- Atajos: Ctrl+A, Enter, Space, Esc. Notifications API al terminar lotes
+  (solo si la pestaña está en segundo plano). Búsqueda por nombre.
+
+LIMITACIONES TÉCNICAS Y CÓMO SE RESOLVIERON
+- MediaRecorder graba en TIEMPO REAL: un WebP animado de 10s tarda ~10s en
+  convertirse a video. Se muestra la duración estimada en la barra de
+  progreso. La alternativa (WebCodecs VideoEncoder + muxer MP4 manual)
+  exigiría escribir un muxer ISO BMFF completo en JS puro; se priorizó
+  fiabilidad. Dimensiones forzadas a pares (requisito de H.264).
+- MP4: Chrome/Edge recientes soportan video/mp4 en MediaRecorder; si no,
+  fallback automático a WebM con aviso claro en la tarjeta y en un toast.
+- Sin ImageDecoder (Firefox/Safari viejos) los animados se convierten solo
+  con su primer frame; la app lo detecta, lo avisa al cargar y lo anota en
+  el resultado. La detección de tipo/frames sigue siendo exacta porque se
+  hace leyendo los bytes, no con APIs de decodificación.
+- GIF max 256 colores: median-cut con muestreo de 32k píxeles y caché de
+  mapeo a 15 bits para que frames grandes mapeen rápido. Transparencia
+  binaria (alpha<128) con índice reservado, disposal=1 porque ImageDecoder
+  ya entrega frames compuestos (no hace falta reconstruir disposal WebP).
+- readEntries() de la API de directorios devuelve máximo 100 entradas por
+  llamada: se itera hasta vaciar (bug clásico al arrastrar carpetas).
+
+SOPORTE POR NAVEGADOR (junio 2026)
+- Chrome/Edge 94+: todo ✓ (ImageDecoder, OffscreenCanvas, MediaRecorder
+  MP4 en versiones recientes, WebM, workers).
+- Firefox: Canvas/WebM/workers ✓; ImageDecoder ✗ (animados = primer frame),
+  MP4 ✗ (fallback WebM). La app lo indica en el header y en toasts.
+- Safari 16.4+: Canvas ✓, MediaRecorder MP4 ✓ en versiones recientes,
+  ImageDecoder ✗. Mismo fallback de primer frame.
+- Los chips del header reflejan la detección real en tiempo de carga.
+
+NOVEDADES v1.1 (a partir de feedback de uso real)
+- Entrada de VIDEO: ahora acepta WebM y MP4 además de WebP. La detección es
+  binaria (EBML 1A45DFA3 + DocType para WebM/MKV, box "ftyp" para MP4); los
+  metadatos (dimensiones/duración) se leen con un <video> oculto con timeout.
+- Video → MP4/WebM: re-codificación con captureStream() del propio <video> +
+  MediaRecorder, conservando la pista de AUDIO cuando el códec lo permite
+  (con downgrade automático a solo-video si el mime con audio falla).
+- Video → GIF: captura de frames por seek a 10 fps, con límites de seguridad
+  (máx 300 frames / 30s, reescalado a 640px de ancho) para no agotar memoria;
+  cualquier recorte/reescalado se informa en la tarjeta.
+- Video → PNG/JPG/BMP: primer frame.
+- Drag & drop endurecido: dropEffect='copy' explícito, contador de
+  dragenter/dragleave (el resaltado ya no parpadea), fallback a
+  dataTransfer.files cuando items no está disponible, handler también
+  directamente en la dropzone y errores del arrastre visibles en un toast.
+- Formato por defecto corregido: lo clasificado como VIDEO (webp animado
+  >10s o archivo de video) ahora propone MP4 (o WebM como fallback), ya no GIF.
+
+QUÉ MEJORARÍA CON MÁS TIEMPO / BACKEND
+- Muxer MP4 (ISO BMFF) + WebCodecs para codificar video más rápido que
+  tiempo real y con control de bitrate exacto.
+- Dithering Floyd-Steinberg opcional en el GIF (mejor degradado, más grano).
+- Decodificador VP8/VP8L propio en WASM para animados en Firefox/Safari.
+- streamsaver/File System Access API para ZIPs de varios GB sin mantenerlos
+  en memoria (showSaveFilePicker + WritableStream).
+============================================================ -->
+</body>
+</html>

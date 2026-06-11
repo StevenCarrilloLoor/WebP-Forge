@@ -1,0 +1,96 @@
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">⚡</div>
+    <div>
+      <h1>WEBP <b>FORGE</b></h1>
+      <small>WEBP · WEBM · MP4 → TODO FORMATO · 100% LOCAL</small>
+    </div>
+  </div>
+  <div id="api-status" title="Capacidades detectadas en este navegador"></div>
+  <div id="global-counter"><b>0</b> archivos &nbsp;|&nbsp; <b>0</b> completados &nbsp;|&nbsp; <b>0</b> procesando</div>
+</header>
+
+<main>
+  <!-- ZONA DE CARGA -->
+  <div id="dropzone" tabindex="0" role="button" aria-label="Zona para soltar archivos WebP">
+    <div class="dz-icon">📥</div>
+    <h2>Arrastra tus archivos WebP, WebM o MP4 aquí</h2>
+    <p>Sin límite de archivos · acepta carpetas completas y videos · todo se procesa en tu equipo, nada se sube a internet</p>
+    <div class="dz-buttons">
+      <button class="btn btn-primary" id="btn-pick">📂 Seleccionar archivos</button>
+      <button class="btn" id="btn-pick-dir">🗂 Seleccionar carpeta</button>
+    </div>
+    <div id="analyze-progress"></div>
+    <input type="file" id="file-input" accept=".webp,.webm,.mp4,.m4v,image/webp,video/webm,video/mp4" multiple hidden>
+    <input type="file" id="dir-input" webkitdirectory hidden>
+  </div>
+
+  <!-- CONTROLES GLOBALES -->
+  <div id="controls">
+    <button class="btn btn-sm" id="btn-selall">Seleccionar todo</button>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2)">
+      Convertir seleccionados a:
+      <select id="global-format">
+        <option value="">— por archivo —</option>
+        <option value="jpg">JPG</option><option value="png">PNG</option><option value="gif">GIF</option>
+        <option value="mp4">MP4</option><option value="webm">WebM</option><option value="bmp">BMP</option>
+      </select>
+    </label>
+    <button class="btn btn-primary" id="btn-convert">🚀 Convertir seleccionados</button>
+    <button class="btn btn-ok" id="btn-zip" disabled>⬇ Descargar todos (ZIP)</button>
+    <div class="spacer"></div>
+    <input type="search" id="search" placeholder="🔍 Buscar archivo…">
+    <label style="display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;color:var(--text-2)" title="Conversiones simultáneas">
+      ∥ <select id="parallel"><option>1</option><option>2</option><option selected>4</option><option>6</option></select>
+    </label>
+    <button class="btn btn-sm btn-danger" id="btn-clear" title="Quitar todos los archivos de la lista">🗑 Limpiar</button>
+  </div>
+
+  <!-- FILTROS -->
+  <div id="filters">
+    <button class="filter-chip active" data-f="all">Todos <span class="n"></span></button>
+    <button class="filter-chip" data-f="static">🟦 Imágenes <span class="n"></span></button>
+    <button class="filter-chip" data-f="anim">🟣 Animados <span class="n"></span></button>
+    <button class="filter-chip" data-f="video">🟠 Video <span class="n"></span></button>
+    <button class="filter-chip" data-f="done">✅ Completados <span class="n"></span></button>
+    <button class="filter-chip" data-f="error">⛔ Con error <span class="n"></span></button>
+  </div>
+
+  <!-- LISTA -->
+  <div id="list"></div>
+  <div id="empty-filter">No hay archivos que coincidan con este filtro o búsqueda.</div>
+
+  <footer>
+    <div>WEBP FORGE · procesamiento 100% local en tu navegador · ningún archivo sale de tu equipo</div>
+    <div class="keys"><kbd>Ctrl+A</kbd> seleccionar todo · <kbd>Enter</kbd> convertir seleccionados · <kbd>Space</kbd> preview · <kbd>Esc</kbd> cerrar</div>
+  </footer>
+</main>
+
+<!-- PANEL DE ESTADÍSTICAS -->
+<div id="stats">
+  <h4>⚙ ESTADÍSTICAS</h4>
+  <div><span>Completados</span><b id="st-done">0</b></div>
+  <div><span>En proceso</span><b id="st-proc">0</b></div>
+  <div><span>Velocidad</span><b id="st-speed">—</b></div>
+  <div><span>Ahorro total</span><b id="st-save">—</b></div>
+  <div><span>Tiempo restante</span><b id="st-eta">—</b></div>
+</div>
+
+<!-- MODAL PREVIEW -->
+<div id="modal" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modal-title"></h3>
+      <button class="btn btn-sm" id="modal-dl">⬇ Descargar</button>
+      <button class="btn btn-sm" id="modal-close">✕ Cerrar</button>
+    </div>
+    <div class="compare">
+      <div class="pane"><h5>ORIGINAL (WEBP)</h5><div id="pane-orig"></div><div class="sz" id="sz-orig"></div></div>
+      <div class="pane"><h5 id="pane-res-title">RESULTADO</h5><div id="pane-res"></div><div class="sz" id="sz-res"></div></div>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
