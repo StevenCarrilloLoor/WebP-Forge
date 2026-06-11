@@ -80,6 +80,63 @@ function toast(msg, kind, ms) {
   if (!CAP.imageDecoder) toast('⚠ Este navegador no soporta <b>ImageDecoder</b>: los WebP animados solo se convertirán usando su primer frame. Usa Chrome o Edge para animaciones completas.', 'warn', 9000);
 })();
 
+// ---------- Detección de GPU (nombre real + encoder por hardware) ----------
+async function detectGPU() {
+  let name = '';
+  // WebGPU: adapter.info (Chrome 121+) da vendor/description
+  try {
+    if (navigator.gpu) {
+      const ad = await navigator.gpu.requestAdapter();
+      const info = ad && (ad.info || (ad.requestAdapterInfo ? await ad.requestAdapterInfo() : null));
+      if (info) name = info.description || info.device || info.vendor || '';
+    }
+  } catch {}
+  // WebGL: UNMASKED_RENDERER suele dar el modelo exacto ("ANGLE (NVIDIA, NVIDIA GeForce RTX 5080...)")
+  try {
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl2') || c.getContext('webgl');
+    if (gl) {
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      const r = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER) || '');
+      if (r.length > name.length) name = r;
+    }
+  } catch {}
+  // Limpiar envoltorio ANGLE y sufijos de API: "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 Direct3D11...)" → "NVIDIA GeForce RTX 5080"
+  let pretty = name;
+  const m = /ANGLE \(([^,]+),\s*([^,)]+)/.exec(name);
+  if (m) pretty = m[2];
+  pretty = pretty.replace(/\s*\(0x[0-9A-Fa-f]+\)/g, '').replace(/\s+(Direct3D|D3D|OpenGL|Vulkan|Metal).*$/i, '').trim();
+  return pretty;
+}
+(async function gpuInit() {
+  const pretty = await detectGPU();
+  let hwEncode = false;
+  // ¿Expone el navegador el encoder de video por HARDWARE de esta GPU?
+  try {
+    if (typeof VideoEncoder !== 'undefined') {
+      for (const c of ['vp09.00.10.08', 'vp8']) {
+        const s = await VideoEncoder.isConfigSupported({ codec: c, width: 1280, height: 720, hardwareAcceleration: 'prefer-hardware' });
+        if (s && s.supported) { hwEncode = true; break; }
+      }
+    }
+  } catch {}
+  CAP.gpuName = pretty;
+  CAP.hwEncode = hwEncode;
+  const short = pretty ? (pretty.length > 26 ? pretty.slice(0, 24) + '…' : pretty) : 'GPU no identificada';
+  const chip = document.createElement('span');
+  chip.id = 'gpu-chip';
+  chip.className = 'chip ' + (pretty ? 'on' : 'off');
+  chip.title = (pretty || 'No se pudo identificar la GPU') + ' — encoder de video por hardware: ' +
+    (hwEncode ? 'DISPONIBLE ✓ (la opción más rápida, ya activada)' : 'no expuesto por el navegador para VP8/VP9; se usará WebCodecs por software (también muy rápido)');
+  chip.textContent = '🎮 ' + short + (hwEncode ? ' · HW✓' : '');
+  $('#api-status').appendChild(chip);
+  const optLabel = $('#opt-gpu') && $('#opt-gpu').closest('label');
+  if (optLabel) optLabel.title = 'Aceleración por hardware con tu GPU' + (pretty ? ' (' + pretty + ')' : '') + '. ' +
+    (hwEncode ? 'Encoder por hardware verificado: la app ya pide prefer-hardware automáticamente — esta ES la opción más rápida.' :
+                'Tu navegador no expone el encoder por hardware para VP8/VP9; con el toggle activo se usa WebCodecs por software, mucho más rápido que el método clásico igualmente.');
+  if (pretty) toast(`🎮 GPU detectada: <b>${escapeHtml(pretty)}</b>${hwEncode ? ' — encoder por hardware listo ⚡' : ''}`, '', 6000);
+})();
+
 // ---------- Ingesta de archivos ----------
 const ACCEPT_RE = /\.(webp|webm|mp4|m4v|gif|png|jpe?g|bmp)$/i;
 const ACCEPT_TYPES = ['image/webp', 'video/webm', 'video/mp4', 'image/gif', 'image/png', 'image/jpeg', 'image/bmp'];
@@ -311,7 +368,7 @@ function buildCard(entry) {
   card.innerHTML = `
     <button class="card-x" data-act="remove" title="Quitar de la lista">✕</button>
     <div class="card-inner">
-      <input type="checkbox" class="sel-box" data-act="sel" ${entry.selected && !invalid ? 'checked' : ''} ${invalid ? 'disabled' : ''}>
+      <input type="checkbox" class="sel-box" data-act="sel" ${entry.selected ? 'checked' : ''}>
       <img class="thumb thumb-skel" alt="">
       <div class="card-body">
         <div class="card-top"><span class="fname" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>${badgeFor(entry)}</div>
@@ -1089,10 +1146,30 @@ function updateStatsPanel(final) {
 
 // ---------- Controles globales ----------
 $('#btn-selall').addEventListener('click', () => {
-  const valid = [...FILES.values()].filter(e => e.status !== 'invalid');
-  const allSel = valid.every(e => e.selected) && valid.length > 0;
-  valid.forEach(e => { e.selected = !allSel; e.els.sel.checked = !allSel; e.els.card.classList.toggle('selected', !allSel); });
+  const all = [...FILES.values()];
+  const allSel = all.every(e => e.selected) && all.length > 0;
+  all.forEach(e => { e.selected = !allSel; if (e.els.sel) e.els.sel.checked = !allSel; e.els.card.classList.toggle('selected', !allSel); });
   refreshCounters();
+});
+// Selecciona exactamente lo visible (combina con los filtros: "solo videos", "solo errores", etc.)
+$('#btn-selvis').addEventListener('click', () => {
+  let n = 0;
+  for (const e of FILES.values()) {
+    const visible = e.els.card.style.display !== 'none';
+    e.selected = visible;
+    if (e.els.sel) e.els.sel.checked = visible;
+    e.els.card.classList.toggle('selected', visible);
+    if (visible) n++;
+  }
+  refreshCounters();
+  toast(`✓ Seleccionados <b>${n}</b> archivo(s) visibles${(activeFilter !== 'all' || searchTerm) ? ' — filtro activo' : ''}`);
+});
+// Quita de la lista solo lo seleccionado
+$('#btn-remove-sel').addEventListener('click', () => {
+  const sel = [...FILES.values()].filter(e => e.selected);
+  if (!sel.length) { toast('No hay archivos seleccionados', 'warn'); return; }
+  sel.forEach(removeEntry);
+  toast(`✂ Quitados <b>${sel.length}</b> archivo(s) de la lista`);
 });
 $('#global-format').addEventListener('change', (e) => {
   const f = e.target.value;
@@ -1184,4 +1261,4 @@ window.addEventListener('beforeunload', () => {
 });
 
 // Hook de depuración/integración (consola): window.WEBPFORGE
-window.WEBPFORGE = { version: '1.3.0', SETTINGS, FILES, CAP, addFiles, parseWebP, detectContainer };
+window.WEBPFORGE = { version: '1.4.0', SETTINGS, FILES, CAP, addFiles, parseWebP, detectContainer };

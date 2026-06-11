@@ -7,14 +7,14 @@ if not exist "%APP%" (
   pause
   exit /b 1
 )
-rem --- Preferir Chrome ---
+set "URL=file:///%APP:\=/%"
+rem --- Chrome en modo app (ventana propia) ---
 for %%P in ("%ProgramFiles%\Google\Chrome\Application\chrome.exe" "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" "%LocalAppData%\Google\Chrome\Application\chrome.exe") do (
-  if exist "%%~P" ( start "" "%%~P" "%APP%" & exit /b 0 )
+  if exist "%%~P" ( start "" "%%~P" --app="%URL%" & exit /b 0 )
 )
-rem --- Luego Edge ---
+rem --- Edge en modo app ---
 for %%P in ("%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe") do (
-  if exist "%%~P" ( start "" "%%~P" "%APP%" & exit /b 0 )
+  if exist "%%~P" ( start "" "%%~P" --app="%URL%" & exit /b 0 )
 )
-rem --- Navegador por defecto ---
 start "" "%APP%"
 exit /b 0

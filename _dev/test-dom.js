@@ -43,7 +43,9 @@ const check = (name, cond, extra) => {
   const $$ = (s) => [...window.document.querySelectorAll(s)];
 
   // Chips de API renderizados
-  check('chips de API', $$('#api-status .chip').length === 6);
+  await new Promise(r => setTimeout(r, 30)); // gpuInit es async
+  check('chips de API (incl. GPU)', $$('#api-status .chip').length === 7);
+  check('chip GPU presente', $('#gpu-chip') && $('#gpu-chip').textContent.includes('🎮'));
   check('chip WebP-out off (jsdom)', $('#api-status').textContent.includes('✗ WebP-out'));
   check('chip ImageDecoder off', $('#api-status').textContent.includes('✗ ImageDecoder'));
 
@@ -127,6 +129,16 @@ const check = (name, cond, extra) => {
   const before = $$('.card').length;
   window.document.querySelector('.card .card-x').click();
   check('quitar archivo', $$('.card').length === before - 1 && window.WEBPFORGE.FILES.size === 6);
+
+  // Flujo: filtrar VIDEO → seleccionar visibles → quitar seleccionados
+  window.document.querySelector('[data-f=video]').click();
+  $('#btn-selvis').click();
+  const selNow = [...window.WEBPFORGE.FILES.values()].filter(e => e.selected);
+  check('selvis: solo el video queda seleccionado', selNow.length === 1 && selNow[0].name === 'video.webm');
+  const sizeBefore = window.WEBPFORGE.FILES.size;
+  $('#btn-remove-sel').click();
+  check('quitar selec.: solo se fue el video', window.WEBPFORGE.FILES.size === sizeBefore - 1 && ![...window.WEBPFORGE.FILES.values()].some(e => e.name === 'video.webm'));
+  window.document.querySelector('[data-f=all]').click();
 
   // Detección directa adicional (header parcial + fullSize)
   const buf = fs.readFileSync('test-assets/animated.webp');

@@ -1,0 +1,71 @@
+{
+  "name": "webp-forge",
+  "productName": "WebP Forge",
+  "description": "Convertidor universal de imágenes y video — 100% local",
+  "version": "1.4.0",
+  "private": true,
+  "author": "Steven Carrillo <stevencarrilloloor@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/StevenCarrilloLoor/WebP-Forge.git"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "publish": "electron-builder --win --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.stevencarrillo.webpforge",
+    "productName": "WebP Forge",
+    "files": [
+      "main.js",
+      "webp-forge.html",
+      "icon.ico",
+      "icon.png"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "StevenCarrilloLoor",
+        "repo": "WebP-Forge"
+      }
+    ],
+    "win": {
+      "icon": "icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "WebP Forge",
+      "artifactName": "WebP-Forge-Setup-${version}.exe"
+    },
+    "portable": {
+      "artifactName": "WebP-Forge-Portable-${version}.exe"
+    }
+  }
+}

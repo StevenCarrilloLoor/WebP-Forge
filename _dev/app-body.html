@@ -30,6 +30,7 @@
   <!-- CONTROLES GLOBALES -->
   <div id="controls">
     <button class="btn btn-sm" id="btn-selall">Seleccionar todo</button>
+    <button class="btn btn-sm" id="btn-selvis" title="Selecciona EXACTAMENTE los archivos visibles con el filtro y búsqueda actuales. Ej: filtra 🟠 Video y pulsa aquí para marcar solo los videos.">✓ Visibles</button>
     <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2)">
       Convertir seleccionados a:
       <select id="global-format">
@@ -51,7 +52,8 @@
     <label class="opt" title="Fidelidad máxima: las conversiones de video a GIF/WebP animado mantienen la resolución ORIGINAL, sin reescalado. Con videos 4K o muy largos puede consumir mucha RAM.">
       <input type="checkbox" id="opt-fidelity" checked> 🎯 Fidelidad máx.
     </label>
-    <button class="btn btn-sm btn-danger" id="btn-clear" title="Quitar todos los archivos de la lista">🗑 Limpiar</button>
+    <button class="btn btn-sm btn-danger" id="btn-remove-sel" title="Quita de la lista SOLO los archivos seleccionados">✂ Quitar selec.</button>
+    <button class="btn btn-sm btn-danger" id="btn-clear" title="Quitar TODOS los archivos de la lista">🗑 Limpiar todo</button>
   </div>
 
   <!-- FILTROS -->
