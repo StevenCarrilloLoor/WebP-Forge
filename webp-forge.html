@@ -106,6 +106,9 @@ main{max-width:1180px;margin:0 auto;padding:26px 22px 90px}
   background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:13px;outline:none;width:170px;transition:all .3s;
 }
 #search:focus{border-color:var(--border-glow);box-shadow:var(--glow)}
+#controls .opt{display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:var(--text-2);cursor:pointer;white-space:nowrap}
+#controls .opt input{accent-color:var(--accent);cursor:pointer}
+#controls .opt:hover{color:var(--text)}
 .spacer{flex:1}
 #filters{display:none;gap:7px;flex-wrap:wrap;margin-top:13px}
 .filter-chip{
@@ -251,7 +254,7 @@ footer .keys{margin-top:6px}
     <div class="logo-mark">⚡</div>
     <div>
       <h1>WEBP <b>FORGE</b></h1>
-      <small>WEBP · WEBM · MP4 → TODO FORMATO · 100% LOCAL</small>
+      <small>CONVIERTE TODO ↔ TODO · 100% LOCAL</small>
     </div>
   </div>
   <div id="api-status" title="Capacidades detectadas en este navegador"></div>
@@ -260,16 +263,16 @@ footer .keys{margin-top:6px}
 
 <main>
   <!-- ZONA DE CARGA -->
-  <div id="dropzone" tabindex="0" role="button" aria-label="Zona para soltar archivos WebP">
+  <div id="dropzone" tabindex="0" role="button" aria-label="Zona para soltar imágenes, videos o ZIPs">
     <div class="dz-icon">📥</div>
-    <h2>Arrastra tus archivos WebP, WebM o MP4 aquí</h2>
-    <p>Sin límite de archivos · acepta carpetas completas y videos · todo se procesa en tu equipo, nada se sube a internet</p>
+    <h2>Arrastra tus imágenes, videos o ZIPs aquí</h2>
+    <p>WebP · GIF · PNG · JPG · BMP · WebM · MP4 · ZIP — sin límite de archivos · acepta carpetas completas · nada se sube a internet</p>
     <div class="dz-buttons">
       <button class="btn btn-primary" id="btn-pick">📂 Seleccionar archivos</button>
       <button class="btn" id="btn-pick-dir">🗂 Seleccionar carpeta</button>
     </div>
     <div id="analyze-progress"></div>
-    <input type="file" id="file-input" accept=".webp,.webm,.mp4,.m4v,image/webp,video/webm,video/mp4" multiple hidden>
+    <input type="file" id="file-input" accept=".webp,.webm,.mp4,.m4v,.gif,.png,.jpg,.jpeg,.bmp,.zip,image/webp,image/gif,image/png,image/jpeg,image/bmp,video/webm,video/mp4,application/zip" multiple hidden>
     <input type="file" id="dir-input" webkitdirectory hidden>
   </div>
 
@@ -280,7 +283,7 @@ footer .keys{margin-top:6px}
       Convertir seleccionados a:
       <select id="global-format">
         <option value="">— por archivo —</option>
-        <option value="jpg">JPG</option><option value="png">PNG</option><option value="gif">GIF</option>
+        <option value="webp">WebP</option><option value="jpg">JPG</option><option value="png">PNG</option><option value="gif">GIF</option>
         <option value="mp4">MP4</option><option value="webm">WebM</option><option value="bmp">BMP</option>
       </select>
     </label>
@@ -290,6 +293,12 @@ footer .keys{margin-top:6px}
     <input type="search" id="search" placeholder="🔍 Buscar archivo…">
     <label style="display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;color:var(--text-2)" title="Conversiones simultáneas">
       ∥ <select id="parallel"><option>1</option><option>2</option><option selected>4</option><option>6</option></select>
+    </label>
+    <label class="opt" title="Aceleración por hardware: usa el encoder de video de tu tarjeta gráfica (WebCodecs) para codificar WebM mucho más rápido que tiempo real. Desactívalo para usar el método clásico.">
+      <input type="checkbox" id="opt-gpu" checked> ⚡ GPU
+    </label>
+    <label class="opt" title="Fidelidad máxima: las conversiones de video a GIF/WebP animado mantienen la resolución ORIGINAL, sin reescalado. Con videos 4K o muy largos puede consumir mucha RAM.">
+      <input type="checkbox" id="opt-fidelity" checked> 🎯 Fidelidad máx.
     </label>
     <button class="btn btn-sm btn-danger" id="btn-clear" title="Quitar todos los archivos de la lista">🗑 Limpiar</button>
   </div>
@@ -333,7 +342,7 @@ footer .keys{margin-top:6px}
       <button class="btn btn-sm" id="modal-close">✕ Cerrar</button>
     </div>
     <div class="compare">
-      <div class="pane"><h5>ORIGINAL (WEBP)</h5><div id="pane-orig"></div><div class="sz" id="sz-orig"></div></div>
+      <div class="pane"><h5 id="pane-orig-title">ORIGINAL</h5><div id="pane-orig"></div><div class="sz" id="sz-orig"></div></div>
       <div class="pane"><h5 id="pane-res-title">RESULTADO</h5><div id="pane-res"></div><div class="sz" id="sz-res"></div></div>
     </div>
   </div>
@@ -406,6 +415,8 @@ function parseWebP(buffer, fullSize) {
     while (off + 8 <= buffer.byteLength) {
       const fcc = readFourCC(view, off);
       const size = view.getUint32(off + 4, true);
+      if (fcc === 'VP8 ') info.subtype = 'lossy';
+      else if (fcc === 'VP8L') info.subtype = 'lossless';
       if (fcc === 'ANMF' && off + 8 + 16 <= buffer.byteLength) {
         frames++;
         // Duración del frame: 24 bits LE en payload offset 12
@@ -448,8 +459,305 @@ function detectContainer(buffer) {
     return 'mkv';
   }
   if (readFourCC(view, 4) === 'ftyp') return 'mp4';
+  const b = new Uint8Array(buffer, 0, 8);
+  if (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return 'jpg';
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) return 'png';
+  if (readFourCC(view, 0) === 'GIF8') return 'gif';
+  if (b[0] === 0x50 && b[1] === 0x4B && (b[2] === 0x03 || b[2] === 0x05 || b[2] === 0x07)) return 'zip';
+  if (b[0] === 0x42 && b[1] === 0x4D) return 'bmp';
   return 'unknown';
 }
+
+// ---------- Parsers de imágenes "normales" (GIF / PNG / JPEG / BMP) ----------
+function parsePNG(buffer) {
+  const v = new DataView(buffer);
+  return { width: v.getUint32(16, false), height: v.getUint32(20, false) };
+}
+function parseBMP(buffer) {
+  const v = new DataView(buffer);
+  return { width: v.getInt32(18, true), height: Math.abs(v.getInt32(22, true)) };
+}
+// Recorre segmentos JPEG hasta el SOF para extraer dimensiones (EXIF puede ir antes)
+function parseJPEG(buffer) {
+  const b = new Uint8Array(buffer);
+  let pos = 2;
+  while (pos + 9 < b.length) {
+    if (b[pos] !== 0xFF) { pos++; continue; }
+    let marker = b[pos + 1];
+    if (marker === 0xFF) { pos++; continue; }
+    if (marker >= 0xD0 && marker <= 0xD9) { pos += 2; continue; } // RST/SOI/EOI: sin longitud
+    if (marker >= 0xC0 && marker <= 0xCF && marker !== 0xC4 && marker !== 0xC8 && marker !== 0xCC) {
+      return { height: (b[pos + 5] << 8) | b[pos + 6], width: (b[pos + 7] << 8) | b[pos + 8] };
+    }
+    pos += 2 + ((b[pos + 2] << 8) | b[pos + 3]);
+  }
+  return null;
+}
+// Recorre la estructura de bloques GIF: frames, duración total y loop count (NETSCAPE)
+function parseGIF(buffer) {
+  const b = new Uint8Array(buffer);
+  const v = new DataView(buffer);
+  const out = { width: v.getUint16(6, true), height: v.getUint16(8, true), frames: 0, durationMs: 0, loopCount: 0, animated: false };
+  let pos = 13;
+  if (b[10] & 0x80) pos += 3 * (1 << ((b[10] & 7) + 1)); // saltar GCT
+  let lastDelay = 0;
+  const skipSub = () => { let l; while (pos < b.length && (l = b[pos++]) !== 0) pos += l; };
+  while (pos < b.length) {
+    const t = b[pos++];
+    if (t === 0x3B) break;
+    if (t === 0x21) { // extensión: el cuerpo SIEMPRE es una secuencia de sub-bloques
+      const label = b[pos++];
+      if (label === 0xF9 && b[pos] === 4) lastDelay = v.getUint16(pos + 2, true) * 10;
+      if (label === 0xFF && b[pos] === 11 && String.fromCharCode(...b.slice(pos + 1, pos + 9)) === 'NETSCAPE') {
+        const p = pos + 12;
+        if (b[p] === 3) out.loopCount = v.getUint16(p + 2, true);
+      }
+      skipSub();
+    } else if (t === 0x2C) { // image descriptor
+      out.frames++;
+      out.durationMs += lastDelay || 100; // delay 0 → ~100ms (convención de navegadores)
+      lastDelay = 0;
+      pos += 8;
+      const p2 = b[pos]; pos++;
+      if (p2 & 0x80) pos += 3 * (1 << ((p2 & 7) + 1)); // saltar LCT
+      pos++; // min code size LZW
+      skipSub();
+    } else break; // byte inesperado: dejar de recorrer (header ya leído)
+  }
+  out.animated = out.frames > 1;
+  return out;
+}
+
+// ---------- Muxer de WebP ANIMADO (VP8X + ANIM + ANMF, JS puro) ----------
+// Extrae los chunks de bitstream (ALPH/VP8/VP8L) de un WebP estático
+function extractWebPFrameChunks(buffer) {
+  const v = new DataView(buffer);
+  if (readFourCC(v, 0) !== 'RIFF' || readFourCC(v, 8) !== 'WEBP') throw new Error('frame no es WebP');
+  let off = 12;
+  const parts = [];
+  let hasAlpha = false;
+  while (off + 8 <= buffer.byteLength) {
+    const fcc = readFourCC(v, off);
+    const size = v.getUint32(off + 4, true);
+    const tot = 8 + size + (size & 1);
+    if (fcc === 'VP8 ' || fcc === 'VP8L' || fcc === 'ALPH') {
+      const p = new Uint8Array(tot); // padding a par garantizado aunque falte en el archivo
+      p.set(new Uint8Array(buffer, off, Math.min(tot, buffer.byteLength - off)));
+      parts.push(p);
+      if (fcc === 'ALPH') hasAlpha = true;
+      if (fcc === 'VP8L' && v.getUint8(off + 8) === 0x2F && (((v.getUint32(off + 9, true) >>> 28) & 1) === 1)) hasAlpha = true;
+    }
+    off += tot;
+  }
+  if (!parts.length) throw new Error('frame WebP sin bitstream VP8/VP8L');
+  return { parts, hasAlpha };
+}
+/**
+ * Construye un WebP ANIMADO muxeando frames WebP estáticos (p.ej. de canvas.toBlob).
+ * frames: [{ bytes: Uint8Array|ArrayBuffer (webp estático completo), delayMs }]
+ * Duración ANMF en milisegundos (así lo define la spec del contenedor WebP).
+ */
+function buildAnimatedWebP(frames, W, H, loopCount) {
+  let anyAlpha = false;
+  const u24 = (arr, v) => { arr.push(v & 255, (v >> 8) & 255, (v >> 16) & 255); };
+  const anmfs = frames.map(f => {
+    const buf = f.bytes instanceof Uint8Array ? f.bytes.buffer.slice(f.bytes.byteOffset, f.bytes.byteOffset + f.bytes.byteLength) : f.bytes;
+    const { parts, hasAlpha } = extractWebPFrameChunks(buf);
+    anyAlpha = anyAlpha || hasAlpha;
+    const head = [];
+    u24(head, 0); u24(head, 0);            // X/2, Y/2
+    u24(head, W - 1); u24(head, H - 1);    // dimensiones del frame
+    u24(head, Math.max(Math.round(f.delayMs || 100), 10)); // duración ms
+    head.push(0x02);                        // flags: no-blend (frames ya compuestos), no dispose
+    let size = 16;
+    parts.forEach(p => size += p.length);
+    return { head, parts, size };
+  });
+  const out = [];
+  const pushStr = s => { for (const c of s) out.push(c.charCodeAt(0)); };
+  const push32 = v => { out.push(v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255); };
+  pushStr('RIFF'); push32(0); pushStr('WEBP');
+  pushStr('VP8X'); push32(10);
+  out.push(0x02 | (anyAlpha ? 0x10 : 0), 0, 0, 0); // flags: animation (+alpha)
+  u24(out, W - 1); u24(out, H - 1);
+  pushStr('ANIM'); push32(6); push32(0); // bg color
+  out.push(loopCount & 255, (loopCount >> 8) & 255);
+  for (const a of anmfs) {
+    pushStr('ANMF'); push32(a.size);
+    for (const x of a.head) out.push(x);
+    for (const p of a.parts) for (let i = 0; i < p.length; i++) out.push(p[i]);
+    if (a.size & 1) out.push(0);
+  }
+  const res = new Uint8Array(out);
+  const rs = res.length - 8;
+  res[4] = rs & 255; res[5] = (rs >> 8) & 255; res[6] = (rs >> 16) & 255; res[7] = (rs >>> 24) & 255;
+  return res;
+}
+
+// ---------- Lector ZIP (descompresión con DecompressionStream nativo) ----------
+/**
+ * Lista las entradas de un ZIP leyendo el End Of Central Directory + Central Directory.
+ * Devuelve [{ name, method, compStart, compSize, uncompSize }]. Sin soporte de cifrado/ZIP64.
+ */
+function listZipEntries(buffer) {
+  const v = new DataView(buffer);
+  const len = buffer.byteLength;
+  // EOCD: buscar firma 0x06054b50 desde el final (comentario máx 64KB)
+  let eocd = -1;
+  for (let i = len - 22; i >= Math.max(0, len - 22 - 65535); i--) {
+    if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('ZIP sin End Of Central Directory — archivo corrupto');
+  let count = v.getUint16(eocd + 10, true);
+  let off = v.getUint32(eocd + 16, true);
+  // ZIP64: si los valores están saturados, leer el EOCD64 (vía su locator, 20 bytes antes)
+  if (count === 0xFFFF || off === 0xFFFFFFFF) {
+    const locAt = eocd - 20;
+    if (locAt >= 0 && v.getUint32(locAt, true) === 0x07064b50) {
+      const e64 = Number(v.getBigUint64(locAt + 8, true));
+      if (e64 + 56 <= len && v.getUint32(e64, true) === 0x06064b50) {
+        count = Number(v.getBigUint64(e64 + 32, true));
+        off = Number(v.getBigUint64(e64 + 48, true));
+      }
+    }
+  }
+  const decoder = new TextDecoder();
+  const entries = [];
+  for (let n = 0; n < count; n++) {
+    if (off + 46 > len || v.getUint32(off, true) !== 0x02014b50) break;
+    const flags = v.getUint16(off + 8, true);
+    const method = v.getUint16(off + 10, true);
+    let compSize = v.getUint32(off + 20, true);
+    let uncompSize = v.getUint32(off + 24, true);
+    const nameLen = v.getUint16(off + 28, true);
+    const extraLen = v.getUint16(off + 30, true);
+    const commentLen = v.getUint16(off + 32, true);
+    let localOff = v.getUint32(off + 42, true);
+    // Campo extra ZIP64 (id 0x0001): valores reales de los campos saturados a 0xFFFFFFFF,
+    // en orden fijo: uncompSize, compSize, localOffset (solo los que estén saturados)
+    let ep = off + 46 + nameLen;
+    const eEnd = Math.min(ep + extraLen, len);
+    while (ep + 4 <= eEnd) {
+      const id = v.getUint16(ep, true);
+      const sz = v.getUint16(ep + 2, true);
+      if (id === 0x0001) {
+        let fp = ep + 4;
+        if (uncompSize === 0xFFFFFFFF && fp + 8 <= eEnd) { uncompSize = Number(v.getBigUint64(fp, true)); fp += 8; }
+        if (compSize === 0xFFFFFFFF && fp + 8 <= eEnd) { compSize = Number(v.getBigUint64(fp, true)); fp += 8; }
+        if (localOff === 0xFFFFFFFF && fp + 8 <= eEnd) { localOff = Number(v.getBigUint64(fp, true)); fp += 8; }
+      }
+      ep += 4 + sz;
+    }
+    const name = decoder.decode(new Uint8Array(buffer, off + 46, nameLen));
+    if (!(flags & 0x01) && !name.endsWith('/') && localOff + 30 <= len) { // sin cifrar, no directorio
+      // El header local repite name/extra con longitudes propias
+      const lNameLen = v.getUint16(localOff + 26, true);
+      const lExtraLen = v.getUint16(localOff + 28, true);
+      entries.push({ name, method, compStart: localOff + 30 + lNameLen + lExtraLen, compSize, uncompSize });
+    }
+    off += 46 + nameLen + extraLen + commentLen;
+  }
+  return entries;
+}
+/** Extrae una entrada: store directo; deflate vía DecompressionStream('deflate-raw'). */
+async function extractZipEntry(buffer, entry) {
+  if (entry.compStart + entry.compSize > buffer.byteLength) throw new Error('entrada fuera de rango — ZIP truncado o variante no soportada');
+  const comp = new Uint8Array(buffer, entry.compStart, entry.compSize);
+  if (entry.method === 0) return comp.slice();
+  if (entry.method !== 8) throw new Error('Método de compresión ' + entry.method + ' no soportado (solo store/deflate)');
+  if (typeof DecompressionStream === 'undefined') throw new Error('DecompressionStream no disponible en este navegador');
+  const ds = new DecompressionStream('deflate-raw');
+  const stream = new Blob([comp]).stream().pipeThrough(ds);
+  const buf = await new Response(stream).arrayBuffer();
+  return new Uint8Array(buf);
+}
+
+// ---------- Muxer WebM (EBML) para WebCodecs VideoEncoder ----------
+// Permite codificar más rápido que tiempo real: VideoEncoder (acelerado por
+// hardware cuando está disponible) produce chunks VP8/VP9 y aquí se muxean.
+function _vint(n) {
+  let len = 1;
+  while (n >= Math.pow(2, 7 * len) - 1 && len < 8) len++;
+  const b = new Uint8Array(len);
+  let val = n;
+  for (let i = len - 1; i >= 0; i--) { b[i] = val & 0xFF; val = Math.floor(val / 256); }
+  b[0] |= (0x80 >> (len - 1));
+  return b;
+}
+function _ebml(id, payload) {
+  const sz = _vint(payload.length);
+  const out = new Uint8Array(id.length + sz.length + payload.length);
+  out.set(id, 0); out.set(sz, id.length); out.set(payload, id.length + sz.length);
+  return out;
+}
+function _cat(arrs) {
+  let n = 0; arrs.forEach(a => n += a.length);
+  const o = new Uint8Array(n); let p = 0;
+  arrs.forEach(a => { o.set(a, p); p += a.length; });
+  return o;
+}
+function _uintBE(n) {
+  if (n === 0) return new Uint8Array([0]);
+  const b = []; let v = n;
+  while (v > 0) { b.unshift(v & 0xFF); v = Math.floor(v / 256); }
+  return new Uint8Array(b);
+}
+function _f64(f) { const b = new ArrayBuffer(8); new DataView(b).setFloat64(0, f, false); return new Uint8Array(b); }
+function _str(s) { const b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i); return b; }
+/**
+ * Construye un WebM válido. codecId: 'V_VP8'|'V_VP9'.
+ * blocks: [{ data: Uint8Array, key: bool, timestampMs }] ordenados.
+ */
+function buildWebM(codecId, W, H, blocks, durationMs) {
+  const ID = {
+    EBML: [0x1A,0x45,0xDF,0xA3], EBMLVersion: [0x42,0x86], EBMLReadVersion: [0x42,0xF7],
+    EBMLMaxIDLength: [0x42,0xF2], EBMLMaxSizeLength: [0x42,0xF3], DocType: [0x42,0x82],
+    DocTypeVersion: [0x42,0x87], DocTypeReadVersion: [0x42,0x85],
+    Segment: [0x18,0x53,0x80,0x67], Info: [0x15,0x49,0xA9,0x66], TimecodeScale: [0x2A,0xD7,0xB1],
+    MuxingApp: [0x4D,0x80], WritingApp: [0x57,0x41], Duration: [0x44,0x89],
+    Tracks: [0x16,0x54,0xAE,0x6B], TrackEntry: [0xAE], TrackNumber: [0xD7], TrackUID: [0x73,0xC5],
+    TrackType: [0x83], CodecID: [0x86], Video: [0xE0], PixelWidth: [0xB0], PixelHeight: [0xBA],
+    Cluster: [0x1F,0x43,0xB6,0x75], Timecode: [0xE7], SimpleBlock: [0xA3],
+  };
+  const header = _ebml(ID.EBML, _cat([
+    _ebml(ID.EBMLVersion, _uintBE(1)), _ebml(ID.EBMLReadVersion, _uintBE(1)),
+    _ebml(ID.EBMLMaxIDLength, _uintBE(4)), _ebml(ID.EBMLMaxSizeLength, _uintBE(8)),
+    _ebml(ID.DocType, _str('webm')), _ebml(ID.DocTypeVersion, _uintBE(2)), _ebml(ID.DocTypeReadVersion, _uintBE(2)),
+  ]));
+  // TimecodeScale 1.000.000 ns = timestamps en milisegundos
+  const info = _ebml(ID.Info, _cat([
+    _ebml(ID.TimecodeScale, _uintBE(1000000)),
+    _ebml(ID.Duration, _f64(Math.max(durationMs, 1))),
+    _ebml(ID.MuxingApp, _str('webpforge')), _ebml(ID.WritingApp, _str('webpforge')),
+  ]));
+  const tracks = _ebml(ID.Tracks, _ebml(ID.TrackEntry, _cat([
+    _ebml(ID.TrackNumber, _uintBE(1)), _ebml(ID.TrackUID, _uintBE(1)), _ebml(ID.TrackType, _uintBE(1)),
+    _ebml(ID.CodecID, _str(codecId)),
+    _ebml(ID.Video, _cat([_ebml(ID.PixelWidth, _uintBE(W)), _ebml(ID.PixelHeight, _uintBE(H))])),
+  ])));
+  // Clusters: nuevo en cada keyframe o cada ~5s (timecode relativo es int16)
+  const clusters = [];
+  let cur = null, curTc = 0;
+  for (const b of blocks) {
+    const ts = Math.round(b.timestampMs);
+    if (!cur || (b.key && ts - curTc > 0) || ts - curTc > 5000) {
+      if (cur) clusters.push(_ebml(ID.Cluster, _cat(cur)));
+      curTc = ts;
+      cur = [_ebml(ID.Timecode, _uintBE(ts))];
+    }
+    const rel = ts - curTc;
+    const sb = new Uint8Array(4 + b.data.length);
+    sb[0] = 0x81; // track 1 (vint)
+    sb[1] = (rel >> 8) & 0xFF; sb[2] = rel & 0xFF; // int16 BE
+    sb[3] = b.key ? 0x80 : 0x00;
+    sb.set(b.data, 4);
+    cur.push(_ebml(ID.SimpleBlock, sb));
+  }
+  if (cur) clusters.push(_ebml(ID.Cluster, _cat(cur)));
+  const segment = _ebml(ID.Segment, _cat([info, tracks, ..._toArr(clusters)]));
+  return _cat([header, segment]);
+}
+function _toArr(a) { return a; }
 
 // ---------- Cuantización de color (median cut) ----------
 /**
@@ -735,7 +1043,7 @@ const CAP = {
   mediaRecorder: typeof MediaRecorder !== 'undefined',
   worker: typeof Worker !== 'undefined',
   captureStream: typeof HTMLVideoElement !== 'undefined' && (HTMLVideoElement.prototype.captureStream || HTMLVideoElement.prototype.mozCaptureStream),
-  mp4: false, webm: false, mp4Mime: '', webmMime: '', mp4AudioMime: '', webmAudioMime: ''
+  webpEnc: false, mp4: false, webm: false, mp4Mime: '', webmMime: '', mp4AudioMime: '', webmAudioMime: ''
 };
 if (CAP.mediaRecorder) {
   for (const m of ['video/mp4;codecs="avc1.42E01E"', 'video/mp4;codecs=avc1', 'video/mp4']) {
@@ -752,6 +1060,8 @@ if (CAP.mediaRecorder) {
     if (MediaRecorder.isTypeSupported(m)) { CAP.webmAudioMime = m; break; }
   }
 }
+// ¿Puede el canvas exportar WebP? (Chrome/Edge/Opera sí; Firefox/Safari no)
+try { CAP.webpEnc = document.createElement('canvas').toDataURL('image/webp').startsWith('data:image/webp'); } catch { CAP.webpEnc = false; }
 
 // ---------- Estado ----------
 const FILES = new Map();      // id -> entry
@@ -759,7 +1069,9 @@ let nextId = 1;
 let activeFilter = 'all';
 let searchTerm = '';
 let queueRunning = false;
-const sessionPrefs = { format: '', quality: 80 }; // solo en memoria (privacidad)
+const sessionPrefs = { format: '', quality: 100 }; // política: máxima calidad por defecto
+// Opciones del usuario (toggles de la barra de controles)
+const SETTINGS = { gpu: true, fidelity: true };
 const stats = { startedAt: 0, batchDone: 0, batchTotal: 0, times: [] };
 
 // ---------- Helpers ----------
@@ -791,6 +1103,7 @@ function toast(msg, kind, ms) {
     ['WebCodecs', CAP.webcodecs, 'VideoEncoder disponible'],
     ['MP4', CAP.mp4, CAP.mp4 ? 'MediaRecorder puede grabar MP4/H.264' : 'Este navegador no graba MP4 — se usará WebM como fallback'],
     ['WebM', CAP.webm, 'MediaRecorder puede grabar WebM (VP8/VP9)'],
+    ['WebP-out', CAP.webpEnc, CAP.webpEnc ? 'Canvas puede codificar WebP de salida (estático y animado)' : 'Este navegador no codifica WebP de salida'],
   ];
   $('#api-status').innerHTML = chips.map(([n, ok, tip]) =>
     `<span class="chip ${ok ? 'on' : 'off'}" title="${escapeHtml(tip)}">${ok ? '✓' : '✗'} ${n}</span>`).join('');
@@ -798,8 +1111,9 @@ function toast(msg, kind, ms) {
 })();
 
 // ---------- Ingesta de archivos ----------
-const ACCEPT_RE = /\.(webp|webm|mp4|m4v)$/i;
-const ACCEPT_TYPES = ['image/webp', 'video/webm', 'video/mp4'];
+const ACCEPT_RE = /\.(webp|webm|mp4|m4v|gif|png|jpe?g|bmp)$/i;
+const ACCEPT_TYPES = ['image/webp', 'video/webm', 'video/mp4', 'image/gif', 'image/png', 'image/jpeg', 'image/bmp'];
+const ZIP_RE = /\.zip$/i;
 
 async function entriesFromDataTransfer(dt) {
   const out = [];
@@ -809,7 +1123,8 @@ async function entriesFromDataTransfer(dt) {
   if (dt.items && dt.items.length) {
     for (const it of [...dt.items]) {
       if (it.kind !== 'file') continue;
-      const entry = it.webkitGetAsEntry ? it.webkitGetAsEntry() : null;
+      let entry = null;
+      try { entry = it.webkitGetAsEntry ? it.webkitGetAsEntry() : null; } catch {}
       if (entry) walkers.push(walkEntry(entry, out));
       else { const f = it.getAsFile(); if (f) out.push(f); }
     }
@@ -861,20 +1176,57 @@ function defaultFormatFor(entry) {
     if (i.type === 'mp4' && CAP.webm) return 'webm';
     return CAP.mp4 ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
   }
+  if (entry.kind === 'gif') {
+    // GIF animado → WebP animado (mucho más pequeño); sin encoder WebP → video
+    if (CAP.webpEnc) return 'webp';
+    return CAP.mp4 ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
+  }
+  if (entry.kind === 'image') {
+    // Imagen "normal" → WebP es la conversión típica
+    if (CAP.webpEnc) return 'webp';
+    return i.type === 'png' ? 'jpg' : 'png';
+  }
+  // Entrada WebP
   if (i.animated) {
-    // Animaciones largas (clasificadas como VIDEO en la UI) → video, no GIF
     if (i.durationMs > 10000) return CAP.mp4 ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
     return 'gif';
   }
+  // Estático → PNG siempre: política de MÁXIMA CALIDAD (preferencia del usuario).
+  // PNG re-codifica sin ninguna pérdida adicional y conserva transparencia;
+  // el tamaño no es prioridad. (JPG sigue disponible en el selector.)
   return 'png';
 }
 
+// Expande ZIPs: extrae los archivos compatibles que contengan (DecompressionStream nativo)
+async function expandZips(files) {
+  const out = [];
+  for (const f of files) {
+    const looksZip = ZIP_RE.test(f.name) || f.type === 'application/zip' || f.type === 'application/x-zip-compressed';
+    if (!looksZip) { out.push(f); continue; }
+    try {
+      const buf = await f.arrayBuffer();
+      if (detectContainer(buf) !== 'zip') throw new Error('no tiene firma ZIP válida');
+      const entries = listZipEntries(buf);
+      const sup = entries.filter(e => ACCEPT_RE.test(e.name));
+      if (!sup.length) { toast(`📦 <b>${escapeHtml(f.name)}</b>: no contiene archivos compatibles`, 'warn'); continue; }
+      toast(`📦 Extrayendo <b>${sup.length}</b> archivo(s) de ${escapeHtml(f.name)}…`);
+      for (const e of sup) {
+        try {
+          const data = await extractZipEntry(buf, e);
+          out.push(new File([data], e.name.split('/').pop()));
+        } catch (err) { toast(`⛔ ${escapeHtml(e.name)}: ${escapeHtml(err.message)}`, 'err'); }
+      }
+    } catch (err) { toast(`⛔ ZIP ${escapeHtml(f.name)}: ${escapeHtml(err.message)}`, 'err', 6000); }
+  }
+  return out;
+}
+
 async function addFiles(fileList) {
-  const all = [...fileList];
+  const all = await expandZips([...fileList]);
   const accepted = all.filter(f => ACCEPT_RE.test(f.name) || ACCEPT_TYPES.includes(f.type));
   const skipped = all.length - accepted.length;
   if (skipped > 0) toast(`Se omitieron <b>${skipped}</b> archivo(s) no soportados (acepto .webp, .webm, .mp4)`, 'warn');
-  if (!accepted.length) { if (!skipped) toast('No se encontraron archivos WebP/WebM/MP4', 'warn'); return; }
+  if (!accepted.length) { if (!skipped) toast('No se encontraron archivos compatibles (WebP, GIF, PNG, JPG, BMP, WebM, MP4, ZIP)', 'warn'); return; }
 
   const prog = $('#analyze-progress');
   prog.style.display = 'block';
@@ -893,29 +1245,46 @@ async function addFiles(fileList) {
     try {
       const head = await file.slice(0, 4096).arrayBuffer();
       const container = detectContainer(head);
+      const blank = { hasAlpha: false, hasICC: false, hasEXIF: false, hasXMP: false, truncated: false, loopCount: 0, durationMs: 0 };
       if (container === 'webp') {
         entry.kind = 'webp';
         let info = parseWebP(head, file.size);
         if (info.valid && info.animated) info = parseWebP(await file.arrayBuffer(), file.size);
         entry.info = info;
         if (!info.valid) { entry.status = 'invalid'; entry.error = info.reason; }
-        else entry.format = defaultFormatFor(entry);
+      } else if (container === 'gif') {
+        const g = parseGIF(await file.arrayBuffer());
+        entry.kind = g.animated ? 'gif' : 'image';
+        entry.info = { ...blank, valid: g.width > 0 && g.height > 0, type: 'gif', animated: g.animated,
+                       frames: g.frames, width: g.width, height: g.height, durationMs: g.durationMs, loopCount: g.loopCount };
+        if (!entry.info.valid) { entry.status = 'invalid'; entry.error = 'GIF con header inválido'; }
+      } else if (container === 'png' || container === 'jpg' || container === 'bmp') {
+        entry.kind = 'image';
+        let dims = container === 'png' ? parsePNG(head)
+                 : container === 'bmp' ? parseBMP(head)
+                 : parseJPEG(await file.slice(0, 1048576).arrayBuffer());
+        if (!dims || !dims.width || !dims.height) {
+          // Fallback: que el navegador decodifique las dimensiones
+          try { const bmp = await createImageBitmap(file); dims = { width: bmp.width, height: bmp.height }; bmp.close(); }
+          catch { dims = null; }
+        }
+        if (dims) entry.info = { ...blank, valid: true, type: container, animated: false, frames: 1, width: dims.width, height: dims.height };
+        else { entry.status = 'invalid'; entry.info = { valid: false }; entry.error = 'No se pudieron leer las dimensiones de la imagen'; }
       } else if (container === 'webm' || container === 'mp4' || container === 'mkv') {
         entry.kind = 'video';
         try {
           const m = await probeVideo(file);
-          entry.info = { valid: true, video: true, type: container, animated: true, frames: 0,
-                         width: m.width, height: m.height, durationMs: m.durationMs,
-                         loopCount: 0, hasAlpha: false, hasICC: false, hasEXIF: false, hasXMP: false, truncated: false };
-          entry.format = defaultFormatFor(entry);
+          entry.info = { ...blank, valid: true, video: true, type: container, animated: true, frames: 0,
+                         width: m.width, height: m.height, durationMs: m.durationMs };
         } catch (err) {
           entry.status = 'invalid'; entry.info = { valid: false };
           entry.error = `Video ${container.toUpperCase()} detectado, pero no se puede decodificar: ${err.message}`;
         }
       } else {
         entry.status = 'invalid'; entry.info = { valid: false };
-        entry.error = 'Formato no reconocido: ni WebP (RIFF), ni WebM (EBML), ni MP4 (ftyp)';
+        entry.error = 'Formato no reconocido (acepto WebP, GIF, PNG, JPG, BMP, WebM, MP4, ZIP)';
       }
+      if (entry.status !== 'invalid' && entry.info && entry.info.valid) entry.format = defaultFormatFor(entry);
     } catch (err) {
       entry.status = 'invalid'; entry.info = { valid: false };
       entry.error = 'No se pudo leer el archivo: ' + err.message;
@@ -934,7 +1303,7 @@ async function addFiles(fileList) {
 }
 
 // ---------- Tarjetas ----------
-const FORMATS = [['jpg','JPG'],['png','PNG'],['gif','GIF'],['mp4','MP4'],['webm','WebM'],['bmp','BMP']];
+const FORMATS = [['webp','WebP'],['jpg','JPG'],['png','PNG'],['gif','GIF'],['mp4','MP4'],['webm','WebM'],['bmp','BMP']];
 
 function badgeFor(entry) {
   const i = entry.info;
@@ -943,10 +1312,12 @@ function badgeFor(entry) {
     return `<span class="badge video">🟠 VIDEO ${i.type.toUpperCase()} · ${(i.durationMs/1000).toFixed(1)}s</span>`;
   }
   if (i.animated) {
-    if (i.durationMs > 10000) return `<span class="badge video">🟠 VIDEO · ${i.frames} frames · ${(i.durationMs/1000).toFixed(1)}s</span>`;
-    return `<span class="badge anim">🟣 ANIMADO · ${i.frames} frames</span>`;
+    const label = entry.kind === 'gif' ? 'GIF ANIMADO' : 'ANIMADO';
+    if (i.durationMs > 10000) return `<span class="badge video">🟠 ${label} · ${i.frames} frames · ${(i.durationMs/1000).toFixed(1)}s</span>`;
+    return `<span class="badge anim">🟣 ${label} · ${i.frames} frames</span>`;
   }
-  return `<span class="badge static">🟦 ${i.type === 'lossy' ? 'LOSSY (VP8)' : i.type === 'lossless' ? 'LOSSLESS (VP8L)' : 'ESTÁTICO (VP8X)'}</span>`;
+  const names = { lossy: 'LOSSY (VP8)', lossless: 'LOSSLESS (VP8L)', extended: 'ESTÁTICO (VP8X)', gif: 'GIF', png: 'PNG', jpg: 'JPEG', bmp: 'BMP' };
+  return `<span class="badge static">🟦 ${names[i.type] || i.type.toUpperCase()}</span>`;
 }
 function metaFor(entry) {
   const i = entry.info;
@@ -979,7 +1350,7 @@ function buildCard(entry) {
         <div class="card-controls">
           <label style="font-size:12px;color:var(--text-2)">Convertir a:</label>
           <select class="fmt-select" data-act="fmt">${FORMATS.map(([v, l]) => `<option value="${v}" ${v === entry.format ? 'selected' : ''}>${l}</option>`).join('')}</select>
-          <span class="q-wrap" style="${entry.format === 'jpg' ? '' : 'display:none'}">Calidad <input type="range" min="10" max="100" value="${entry.quality}" data-act="q"> <span class="qv">${entry.quality}%</span></span>
+          <span class="q-wrap" style="${['jpg','webp'].includes(entry.format) ? '' : 'display:none'}">Calidad <input type="range" min="10" max="100" value="${entry.quality}" data-act="q"> <span class="qv">${entry.quality}%</span></span>
           <button class="btn btn-sm" data-act="convert">⚙ Convertir</button>
         </div>
         <div class="progress-row"><div class="pbar"><div class="pbar-fill"></div></div><span class="ptext"></span></div>
@@ -1065,7 +1436,7 @@ $('#list').addEventListener('change', (e) => {
   else if (act === 'fmt') {
     entry.format = e.target.value;
     sessionPrefs.format = '';
-    entry.els.qwrap.style.display = entry.format === 'jpg' ? '' : 'none';
+    entry.els.qwrap.style.display = ['jpg','webp'].includes(entry.format) ? '' : 'none';
     if ((entry.format === 'mp4' && !CAP.mp4 && CAP.webm)) toast('Este navegador no graba MP4 — se generará <b>WebM</b> como fallback', 'warn');
   }
 });
@@ -1087,9 +1458,17 @@ function removeEntry(entry) {
 
 // ---------- Decodificación WebP ----------
 async function decodeAllFrames(entry, onProg, firstOnly) {
+  if (entry.kind === 'image') {
+    const bmp = await createImageBitmap(entry.file);
+    onProg && onProg('Decodificado', 35);
+    return [{ bmp, delayMs: 100 }];
+  }
+  const mime = entry.kind === 'gif' ? 'image/gif' : 'image/webp';
   const buf = await entry.file.arrayBuffer();
-  if (CAP.imageDecoder) {
-    const dec = new ImageDecoder({ data: buf, type: 'image/webp' });
+  let decoderOk = false;
+  if (CAP.imageDecoder) { try { decoderOk = await ImageDecoder.isTypeSupported(mime); } catch { decoderOk = false; } }
+  if (decoderOk) {
+    const dec = new ImageDecoder({ data: buf, type: mime });
     await dec.tracks.ready;
     const track = dec.tracks.selectedTrack;
     const count = firstOnly ? 1 : (track.frameCount || 1);
@@ -1109,7 +1488,7 @@ async function decodeAllFrames(entry, onProg, firstOnly) {
     return frames;
   }
   // Fallback universal: createImageBitmap decodifica el primer frame
-  const bmp = await createImageBitmap(new Blob([buf], { type: 'image/webp' }));
+  const bmp = await createImageBitmap(new Blob([buf], { type: mime }));
   onProg && onProg('Decodificado (primer frame)', 35);
   return [{ bmp, delayMs: 100 }];
 }
@@ -1157,12 +1536,18 @@ function seekTo(v, t) {
 async function videoFrames(entry, onProg) {
   const { v, url } = await videoElement(entry);
   try {
-    const FPS = 10, MAX_FRAMES = 300, MAX_W = 640;
+    const FPS = 10;
+    // 🎯 Fidelidad máx.: resolución ORIGINAL, hasta 2 min de captura.
+    // Modo seguro (toggle apagado): reescala a 960px y 30s para proteger la RAM.
+    const MAX_FRAMES = SETTINGS.fidelity ? 1200 : 300;
+    const MAX_W = SETTINGS.fidelity ? Infinity : 960;
     const scale = Math.min(1, MAX_W / v.videoWidth);
     const W = Math.max(2, Math.round(v.videoWidth * scale) & ~1);
     const H = Math.max(2, Math.round(v.videoHeight * scale) & ~1);
     const total = Math.min(Math.ceil((v.duration || 0) * FPS), MAX_FRAMES);
     if (total < 1) throw new Error('duración de video inválida');
+    const estBytes = W * H * 4 * total;
+    if (estBytes > 2_000_000_000) toast(`⚠ Esta captura necesita ≈ <b>${humanSize(estBytes)}</b> de RAM (${total} frames a ${W}×${H}). Si la pestaña se queda sin memoria, desactiva 🎯 Fidelidad máx.`, 'warn', 10000);
     const c = makeCanvas(W, H);
     const ctx = c.getContext('2d', { willReadFrequently: true });
     const frames = [];
@@ -1173,7 +1558,7 @@ async function videoFrames(entry, onProg) {
       onProg(`Capturando frame ${i + 1}/${total}`, 5 + (i + 1) / total * 45);
     }
     const note = [];
-    if (scale < 1) note.push(`reescalado a ${W}×${H}`);
+    if (scale < 1) note.push(`reescalado a ${W}×${H} (modo seguro)`);
     if ((v.duration || 0) * FPS > MAX_FRAMES) note.push(`recortado a ${MAX_FRAMES / FPS}s`);
     return { frames, W, H, note: note.join(', ') };
   } finally { URL.revokeObjectURL(url); }
@@ -1208,11 +1593,11 @@ async function videoToVideo(entry, wantMp4, onProg) {
     let mime = useMp4 ? (hasAudio && CAP.mp4AudioMime ? CAP.mp4AudioMime : CAP.mp4Mime)
                       : (hasAudio && CAP.webmAudioMime ? CAP.webmAudioMime : CAP.webmMime);
     let rec;
-    try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 }); }
+    try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 16_000_000 }); }
     catch { // códec de audio no soportado → quitar audio y reintentar solo con video
       stream.getAudioTracks().forEach(t => stream.removeTrack(t));
       mime = useMp4 ? CAP.mp4Mime : CAP.webmMime;
-      rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+      rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 16_000_000 });
     }
     const chunks = [];
     rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
@@ -1286,7 +1671,7 @@ async function framesToVideo(frames, w, h, wantMp4, onProg) {
   const canReq = track && typeof track.requestFrame === 'function';
   if (!canReq) { stream = canvas.captureStream(30); track = stream.getVideoTracks()[0]; }
 
-  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 16_000_000 });
   const chunks = [];
   rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
   const stopped = new Promise(r => { rec.onstop = r; });
@@ -1318,13 +1703,92 @@ async function framesToVideo(frames, w, h, wantMp4, onProg) {
   return { blob: new Blob(chunks, { type: mime.split(';')[0] }), ext, fellBack: wantMp4 && !useMp4 };
 }
 
+// ---------- WebP animado desde frames (canvas → webp estático → muxer propio) ----------
+async function framesToAnimatedWebP(frames, w, h, loop, q, onProg) {
+  const c = makeCanvas(w, h);
+  const ctx = c.getContext('2d');
+  const enc = [];
+  for (let i = 0; i < frames.length; i++) {
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(frames[i].bmp, 0, 0);
+    const fb = await canvasToBlob(c, 'image/webp', q);
+    enc.push({ bytes: new Uint8Array(await fb.arrayBuffer()), delayMs: frames[i].delayMs });
+    onProg && onProg(`Codificando frame WebP ${i + 1}/${frames.length}`, 40 + (i + 1) / frames.length * 55);
+    if (i % 5 === 4) await raf();
+  }
+  return new Blob([buildAnimatedWebP(enc, w, h, loop)], { type: 'image/webp' });
+}
+
+// ---------- WebM acelerado: WebCodecs VideoEncoder + muxer EBML propio ----------
+// Mucho más rápido que MediaRecorder (no está atado a tiempo real) y usa el
+// encoder por hardware del sistema cuando está disponible.
+async function framesToWebMFast(frames, w, h, onProg) {
+  const W = Math.max(2, w & ~1), H = Math.max(2, h & ~1);
+  let codec = null, codecId = null, hwConfig = null;
+  for (const [c, id] of [['vp09.00.10.08', 'V_VP9'], ['vp8', 'V_VP8']]) {
+    // Pedir explícitamente el encoder por HARDWARE; si el sistema no lo ofrece
+    // para este códec, aceptar el que haya (software WebCodecs sigue siendo
+    // mucho más rápido que MediaRecorder en tiempo real).
+    try {
+      const hw = await VideoEncoder.isConfigSupported({ codec: c, width: W, height: H, hardwareAcceleration: 'prefer-hardware' });
+      if (hw.supported) { codec = c; codecId = id; hwConfig = 'prefer-hardware'; break; }
+    } catch {}
+    try {
+      const sup = await VideoEncoder.isConfigSupported({ codec: c, width: W, height: H });
+      if (sup.supported) { codec = c; codecId = id; hwConfig = null; break; }
+    } catch {}
+  }
+  if (!codec) throw new Error('VideoEncoder sin soporte VP8/VP9');
+  const blocks = [];
+  let encError = null;
+  const enc = new VideoEncoder({
+    output: (chunk) => {
+      const d = new Uint8Array(chunk.byteLength);
+      chunk.copyTo(d);
+      blocks.push({ data: d, key: chunk.type === 'key', timestampMs: chunk.timestamp / 1000 });
+    },
+    error: (e) => { encError = e; }
+  });
+  const cfg = { codec, width: W, height: H, bitrate: 16_000_000 };
+  if (hwConfig) cfg.hardwareAcceleration = hwConfig;
+  enc.configure(cfg);
+  const c = makeCanvas(W, H);
+  const ctx = c.getContext('2d');
+  let ts = 0;
+  for (let i = 0; i < frames.length; i++) {
+    ctx.drawImage(frames[i].bmp, 0, 0, W, H);
+    const vf = new VideoFrame(c, { timestamp: ts * 1000, duration: Math.max(frames[i].delayMs, 10) * 1000 });
+    enc.encode(vf, { keyFrame: i % 60 === 0 });
+    vf.close();
+    ts += Math.max(frames[i].delayMs, 10);
+    onProg && onProg(`Codificando ⚡WebCodecs ${i + 1}/${frames.length}`, 40 + (i + 1) / frames.length * 50);
+    if (i % 10 === 9) await raf();
+  }
+  await enc.flush();
+  enc.close();
+  if (encError) throw encError;
+  if (!blocks.length) throw new Error('VideoEncoder no produjo chunks');
+  return new Blob([buildWebM(codecId, W, H, blocks, ts)], { type: 'video/webm' });
+}
+// Comprueba que un blob de video es decodificable antes de darlo por bueno
+function validateVideoBlob(blob) {
+  return new Promise((res) => {
+    const url = URL.createObjectURL(blob);
+    const v = document.createElement('video');
+    const t = setTimeout(() => { URL.revokeObjectURL(url); res(false); }, 8000);
+    v.onloadedmetadata = () => { clearTimeout(t); URL.revokeObjectURL(url); res(v.videoWidth > 0); };
+    v.onerror = () => { clearTimeout(t); URL.revokeObjectURL(url); res(false); };
+    v.src = url;
+  });
+}
+
 // ---------- Pipeline de conversión ----------
 function setProgress(entry, text, pct) {
   entry.els.progRow.style.display = 'flex';
   entry.els.ptext.textContent = text;
   entry.els.pfill.style.width = Math.min(100, Math.round(pct)) + '%';
 }
-function baseName(n) { return n.replace(/\.(webp|webm|mp4|m4v)$/i, ''); }
+function baseName(n) { return n.replace(/\.(webp|webm|mp4|m4v|gif|png|jpe?g|bmp)$/i, ''); }
 
 async function convertEntry(entry) {
   if (entry.status === 'processing' || entry.status === 'invalid') return;
@@ -1357,6 +1821,20 @@ async function convertEntry(entry) {
         blob = await encodeGifInWorker(r.frames, r.W, r.H, 0,
           (p) => setProgress(entry, `Codificando GIF ${Math.round(p * 100)}% (LZW)`, 52 + p * 45));
         if (r.note) entry.fallbackNote = 'GIF ' + r.note + ' para controlar memoria y tamaño.';
+      } else if (fmt === 'webp') {
+        if (!CAP.webpEnc) throw new Error('Este navegador no puede codificar WebP de salida');
+        const r = await videoFrames(entry, (t, p) => setProgress(entry, t, p));
+        const c2 = makeCanvas(r.W, r.H);
+        const ctx2 = c2.getContext('2d');
+        const enc = [];
+        for (let i = 0; i < r.frames.length; i++) {
+          ctx2.putImageData(new ImageData(new Uint8ClampedArray(r.frames[i].data), r.W, r.H), 0, 0);
+          const fb = await canvasToBlob(c2, 'image/webp', entry.quality / 100);
+          enc.push({ bytes: new Uint8Array(await fb.arrayBuffer()), delayMs: r.frames[i].delayMs });
+          setProgress(entry, `Codificando frame WebP ${i + 1}/${r.frames.length}`, 55 + (i + 1) / r.frames.length * 42);
+        }
+        blob = new Blob([buildAnimatedWebP(enc, r.W, r.H, 0)], { type: 'image/webp' });
+        if (r.note) entry.fallbackNote = 'WebP animado ' + r.note + '.';
       } else { // png / jpg / bmp → primer frame
         setProgress(entry, `Extrayendo primer frame…`, 30);
         const r = await videoFirstFrame(entry);
@@ -1377,7 +1855,7 @@ async function convertEntry(entry) {
       }
     } else {
       // ===== Entrada WEBP =====
-      const needAllFrames = (fmt === 'gif' || fmt === 'mp4' || fmt === 'webm') && entry.info.animated;
+      const needAllFrames = (fmt === 'gif' || fmt === 'mp4' || fmt === 'webm' || fmt === 'webp') && entry.info.animated;
       setProgress(entry, 'Leyendo archivo…', 2);
       frames = await decodeAllFrames(entry, (t, p) => setProgress(entry, t, p), !needAllFrames);
       if (needAllFrames && frames.length === 1 && entry.info.frames > 1) {
@@ -1385,13 +1863,19 @@ async function convertEntry(entry) {
       }
       const W = frames[0].bmp.width, H = frames[0].bmp.height;
 
-      if (fmt === 'png' || fmt === 'jpg') {
+      if (fmt === 'png' || fmt === 'jpg' || (fmt === 'webp' && frames.length === 1)) {
+        if (fmt === 'webp' && !CAP.webpEnc) throw new Error('Este navegador no puede codificar WebP de salida');
         setProgress(entry, `Codificando ${fmt.toUpperCase()}…`, 60);
         const c = makeCanvas(W, H);
         const ctx = c.getContext('2d');
         if (fmt === 'jpg') { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, W, H); } // JPG no tiene alpha
         ctx.drawImage(frames[0].bmp, 0, 0);
-        blob = await canvasToBlob(c, fmt === 'png' ? 'image/png' : 'image/jpeg', entry.quality / 100);
+        const outMime = fmt === 'png' ? 'image/png' : fmt === 'jpg' ? 'image/jpeg' : 'image/webp';
+        blob = await canvasToBlob(c, outMime, entry.quality / 100);
+      } else if (fmt === 'webp') {
+        if (!CAP.webpEnc) throw new Error('Este navegador no puede codificar WebP de salida');
+        blob = await framesToAnimatedWebP(frames, W, H, entry.info.loopCount || 0, entry.quality / 100,
+          (t, p) => setProgress(entry, t, p));
       } else if (fmt === 'bmp') {
         setProgress(entry, 'Codificando BMP…', 60);
         const id = imageDataFrom(frames[0].bmp, W, H);
@@ -1409,9 +1893,24 @@ async function convertEntry(entry) {
         blob = await encodeGifInWorker(payload, W, H, entry.info.loopCount || 0,
           (p) => setProgress(entry, `Codificando frame ${Math.round(p * frames.length)}/${frames.length} (LZW)`, 52 + p * 45));
       } else if (fmt === 'mp4' || fmt === 'webm') {
-        const secs = entry.info.animated ? (frames.reduce((a, f) => a + Math.max(f.delayMs, 33), 0) / 1000).toFixed(1) : 3;
-        setProgress(entry, `Grabando video en tiempo real (~${secs}s)…`, 40);
-        const r = await framesToVideo(frames, W, H, fmt === 'mp4', (t, p) => setProgress(entry, t, p));
+        let r = null;
+        // ⚡ Vía rápida: WebCodecs (encoder por hardware si existe) + muxer WebM propio.
+        // El resultado se VALIDA decodificándolo; si algo falla → MediaRecorder clásico.
+        if (fmt === 'webm' && SETTINGS.gpu && CAP.webcodecs && typeof VideoFrame !== 'undefined' && frames.length > 1) {
+          try {
+            const fast = await framesToWebMFast(frames, W, H, (t, p) => setProgress(entry, t, p));
+            setProgress(entry, 'Validando WebM generado…', 95);
+            if (await validateVideoBlob(fast)) {
+              r = { blob: fast, ext: 'webm', fellBack: false };
+              entry.fallbackNote = 'codificado con WebCodecs (acelerado, más rápido que tiempo real)';
+            }
+          } catch (e) { console.warn('Vía WebCodecs falló; fallback a MediaRecorder:', e); }
+        }
+        if (!r) {
+          const secs = entry.info.animated ? (frames.reduce((a, f) => a + Math.max(f.delayMs, 33), 0) / 1000).toFixed(1) : 3;
+          setProgress(entry, `Grabando video en tiempo real (~${secs}s)…`, 40);
+          r = await framesToVideo(frames, W, H, fmt === 'mp4', (t, p) => setProgress(entry, t, p));
+        }
         blob = r.blob; ext = r.ext;
         if (r.fellBack) entry.fallbackNote = 'Este navegador no graba MP4: se generó WebM (puedes convertirlo a MP4 con cualquier herramienta local).';
       } else {
@@ -1531,6 +2030,7 @@ function openPreview(entry) {
   $('#modal-title').textContent = entry.name + '  →  ' + entry.outName;
   const orig = $('#pane-orig'), res = $('#pane-res');
   orig.innerHTML = ''; res.innerHTML = '';
+  $('#pane-orig-title').textContent = 'ORIGINAL (' + (entry.name.split('.').pop() || '?').toUpperCase() + ')';
   if (entry.kind === 'video') {
     const ov = document.createElement('video');
     ov.src = URL.createObjectURL(entry.file); ov.controls = true; ov.loop = true; ov.muted = true;
@@ -1566,9 +2066,9 @@ $('#modal-dl').addEventListener('click', () => { if (modalEntry) downloadEntry(m
 function entryMatchesFilter(e, f) {
   switch (f) {
     case 'all': return true;
-    case 'static': return e.kind === 'webp' && e.info && e.info.valid && !e.info.animated;
-    case 'anim': return e.kind === 'webp' && e.info && e.info.valid && e.info.animated && e.info.durationMs <= 10000;
-    case 'video': return (e.kind === 'video' && e.info && e.info.valid) || (e.kind === 'webp' && e.info && e.info.valid && e.info.animated && e.info.durationMs > 10000);
+    case 'static': return e.kind !== 'video' && e.info && e.info.valid && !e.info.animated;
+    case 'anim': return e.kind !== 'video' && e.info && e.info.valid && e.info.animated && e.info.durationMs <= 10000;
+    case 'video': return (e.kind === 'video' && e.info && e.info.valid) || (e.kind !== 'video' && e.info && e.info.valid && e.info.animated && e.info.durationMs > 10000);
     case 'done': return e.status === 'done';
     case 'error': return e.status === 'error' || e.status === 'invalid';
   }
@@ -1632,7 +2132,7 @@ $('#global-format').addEventListener('change', (e) => {
     if (en.status === 'invalid' || !en.selected) continue;
     en.format = f;
     if (en.els.fmt) en.els.fmt.value = f;
-    if (en.els.qwrap) en.els.qwrap.style.display = f === 'jpg' ? '' : 'none';
+    if (en.els.qwrap) en.els.qwrap.style.display = ['jpg','webp'].includes(f) ? '' : 'none';
   }
   if (f === 'mp4' && !CAP.mp4 && CAP.webm) toast('Este navegador no graba MP4 — se generará <b>WebM</b> como fallback', 'warn');
 });
@@ -1643,6 +2143,14 @@ $('#btn-convert').addEventListener('click', () => {
   enqueue(sel);
 });
 $('#btn-zip').addEventListener('click', downloadZip);
+$('#opt-gpu').addEventListener('change', (e) => {
+  SETTINGS.gpu = e.target.checked;
+  toast(SETTINGS.gpu ? '⚡ Aceleración por hardware <b>activada</b> (WebCodecs/GPU)' : 'Aceleración desactivada: se usará el método clásico (tiempo real)');
+});
+$('#opt-fidelity').addEventListener('change', (e) => {
+  SETTINGS.fidelity = e.target.checked;
+  toast(SETTINGS.fidelity ? '🎯 Fidelidad máxima: resolución original, sin reescalado' : 'Modo seguro: reescalado a 960px y máx 30s (protege la RAM)');
+});
 $('#btn-clear').addEventListener('click', () => {
   for (const e of [...FILES.values()]) removeEntry(e);
 });
@@ -1676,7 +2184,10 @@ async function handleDrop(e) {
   try {
     const files = await entriesFromDataTransfer(e.dataTransfer);
     if (files.length) addFiles(files);
-    else toast('No se detectaron archivos en el arrastre', 'warn');
+    else {
+      const types = [...(e.dataTransfer.types || [])].join(', ') || 'ninguno';
+      toast(`El origen del arrastre no entregó archivos (tipos: ${escapeHtml(types)}).<br>💡 Si arrastras desde <b>dentro de un ZIP abierto</b> en el Explorador de Windows, eso no funciona: suelta el archivo .zip completo (yo lo extraigo) o extráelo primero.`, 'warn', 10000);
+    }
   } catch (err) {
     toast('Error procesando el arrastre: ' + escapeHtml(err.message), 'err');
   }
@@ -1703,7 +2214,7 @@ window.addEventListener('beforeunload', () => {
 });
 
 // Hook de depuración/integración (consola): window.WEBPFORGE
-window.WEBPFORGE = { version: '1.1.0', FILES, CAP, addFiles, parseWebP, detectContainer };
+window.WEBPFORGE = { version: '1.3.0', SETTINGS, FILES, CAP, addFiles, parseWebP, detectContainer };
 
 </script>
 
@@ -1782,6 +2293,30 @@ NOVEDADES v1.1 (a partir de feedback de uso real)
   directamente en la dropzone y errores del arrastre visibles en un toast.
 - Formato por defecto corregido: lo clasificado como VIDEO (webp animado
   >10s o archivo de video) ahora propone MP4 (o WebM como fallback), ya no GIF.
+
+NOVEDADES v1.2 — CONVERTIDOR UNIVERSAL + ACELERACIÓN
+- Entradas nuevas: GIF (estático y animado), PNG, JPG, BMP y ZIP. La
+  detección sigue siendo por magic bytes, nunca por extensión. Parsers
+  binarios propios: bloques GIF (frames/delays/NETSCAPE loop), IHDR de PNG,
+  segmentos SOF de JPEG (robusto ante EXIF), header BMP.
+- Salida WebP: estática vía canvas (toBlob image/webp con calidad) y
+  ANIMADA con un muxer VP8X/ANIM/ANMF en JS puro: cada frame se codifica a
+  WebP estático con el encoder nativo del navegador y se extrae su bitstream
+  (chunks ALPH/VP8/VP8L) para ensamblar el contenedor animado. Validado
+  contra el decoder de Pillow (frames, dimensiones y duraciones exactas).
+- GIF animado → WebP animado por defecto (el caso ezgif clásico, 100% local).
+- ZIP de entrada: parser de Central Directory propio + descompresión con
+  DecompressionStream('deflate-raw') NATIVO del navegador (C++ por debajo,
+  sin librerías). Extrae solo los archivos compatibles y los añade a la lista.
+- ⚡ ACELERACIÓN: WebM de salida usa WebCodecs VideoEncoder (encoder por
+  HARDWARE cuando el sistema lo ofrece) + muxer EBML/Matroska escrito a
+  mano — ya no está atado a tiempo real: una animación de 60s se codifica
+  en segundos. El muxer fue validado decodificando su salida con ffmpeg.
+  Cada resultado se auto-VALIDA decodificándolo en un <video>; si algo
+  falla, fallback transparente a MediaRecorder. MP4 sigue en tiempo real
+  (un muxer ISO BMFF correcto es otro proyecto; WebM cubre el caso rápido).
+- Decodificación: ImageDecoder ahora también para image/gif (frame a frame
+  con delays reales); imágenes estáticas por createImageBitmap (GPU).
 
 QUÉ MEJORARÍA CON MÁS TIEMPO / BACKEND
 - Muxer MP4 (ISO BMFF) + WebCodecs para codificar video más rápido que

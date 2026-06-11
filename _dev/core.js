@@ -63,6 +63,8 @@ function parseWebP(buffer, fullSize) {
     while (off + 8 <= buffer.byteLength) {
       const fcc = readFourCC(view, off);
       const size = view.getUint32(off + 4, true);
+      if (fcc === 'VP8 ') info.subtype = 'lossy';
+      else if (fcc === 'VP8L') info.subtype = 'lossless';
       if (fcc === 'ANMF' && off + 8 + 16 <= buffer.byteLength) {
         frames++;
         // Duración del frame: 24 bits LE en payload offset 12
@@ -105,8 +107,305 @@ function detectContainer(buffer) {
     return 'mkv';
   }
   if (readFourCC(view, 4) === 'ftyp') return 'mp4';
+  const b = new Uint8Array(buffer, 0, 8);
+  if (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return 'jpg';
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) return 'png';
+  if (readFourCC(view, 0) === 'GIF8') return 'gif';
+  if (b[0] === 0x50 && b[1] === 0x4B && (b[2] === 0x03 || b[2] === 0x05 || b[2] === 0x07)) return 'zip';
+  if (b[0] === 0x42 && b[1] === 0x4D) return 'bmp';
   return 'unknown';
 }
+
+// ---------- Parsers de imágenes "normales" (GIF / PNG / JPEG / BMP) ----------
+function parsePNG(buffer) {
+  const v = new DataView(buffer);
+  return { width: v.getUint32(16, false), height: v.getUint32(20, false) };
+}
+function parseBMP(buffer) {
+  const v = new DataView(buffer);
+  return { width: v.getInt32(18, true), height: Math.abs(v.getInt32(22, true)) };
+}
+// Recorre segmentos JPEG hasta el SOF para extraer dimensiones (EXIF puede ir antes)
+function parseJPEG(buffer) {
+  const b = new Uint8Array(buffer);
+  let pos = 2;
+  while (pos + 9 < b.length) {
+    if (b[pos] !== 0xFF) { pos++; continue; }
+    let marker = b[pos + 1];
+    if (marker === 0xFF) { pos++; continue; }
+    if (marker >= 0xD0 && marker <= 0xD9) { pos += 2; continue; } // RST/SOI/EOI: sin longitud
+    if (marker >= 0xC0 && marker <= 0xCF && marker !== 0xC4 && marker !== 0xC8 && marker !== 0xCC) {
+      return { height: (b[pos + 5] << 8) | b[pos + 6], width: (b[pos + 7] << 8) | b[pos + 8] };
+    }
+    pos += 2 + ((b[pos + 2] << 8) | b[pos + 3]);
+  }
+  return null;
+}
+// Recorre la estructura de bloques GIF: frames, duración total y loop count (NETSCAPE)
+function parseGIF(buffer) {
+  const b = new Uint8Array(buffer);
+  const v = new DataView(buffer);
+  const out = { width: v.getUint16(6, true), height: v.getUint16(8, true), frames: 0, durationMs: 0, loopCount: 0, animated: false };
+  let pos = 13;
+  if (b[10] & 0x80) pos += 3 * (1 << ((b[10] & 7) + 1)); // saltar GCT
+  let lastDelay = 0;
+  const skipSub = () => { let l; while (pos < b.length && (l = b[pos++]) !== 0) pos += l; };
+  while (pos < b.length) {
+    const t = b[pos++];
+    if (t === 0x3B) break;
+    if (t === 0x21) { // extensión: el cuerpo SIEMPRE es una secuencia de sub-bloques
+      const label = b[pos++];
+      if (label === 0xF9 && b[pos] === 4) lastDelay = v.getUint16(pos + 2, true) * 10;
+      if (label === 0xFF && b[pos] === 11 && String.fromCharCode(...b.slice(pos + 1, pos + 9)) === 'NETSCAPE') {
+        const p = pos + 12;
+        if (b[p] === 3) out.loopCount = v.getUint16(p + 2, true);
+      }
+      skipSub();
+    } else if (t === 0x2C) { // image descriptor
+      out.frames++;
+      out.durationMs += lastDelay || 100; // delay 0 → ~100ms (convención de navegadores)
+      lastDelay = 0;
+      pos += 8;
+      const p2 = b[pos]; pos++;
+      if (p2 & 0x80) pos += 3 * (1 << ((p2 & 7) + 1)); // saltar LCT
+      pos++; // min code size LZW
+      skipSub();
+    } else break; // byte inesperado: dejar de recorrer (header ya leído)
+  }
+  out.animated = out.frames > 1;
+  return out;
+}
+
+// ---------- Muxer de WebP ANIMADO (VP8X + ANIM + ANMF, JS puro) ----------
+// Extrae los chunks de bitstream (ALPH/VP8/VP8L) de un WebP estático
+function extractWebPFrameChunks(buffer) {
+  const v = new DataView(buffer);
+  if (readFourCC(v, 0) !== 'RIFF' || readFourCC(v, 8) !== 'WEBP') throw new Error('frame no es WebP');
+  let off = 12;
+  const parts = [];
+  let hasAlpha = false;
+  while (off + 8 <= buffer.byteLength) {
+    const fcc = readFourCC(v, off);
+    const size = v.getUint32(off + 4, true);
+    const tot = 8 + size + (size & 1);
+    if (fcc === 'VP8 ' || fcc === 'VP8L' || fcc === 'ALPH') {
+      const p = new Uint8Array(tot); // padding a par garantizado aunque falte en el archivo
+      p.set(new Uint8Array(buffer, off, Math.min(tot, buffer.byteLength - off)));
+      parts.push(p);
+      if (fcc === 'ALPH') hasAlpha = true;
+      if (fcc === 'VP8L' && v.getUint8(off + 8) === 0x2F && (((v.getUint32(off + 9, true) >>> 28) & 1) === 1)) hasAlpha = true;
+    }
+    off += tot;
+  }
+  if (!parts.length) throw new Error('frame WebP sin bitstream VP8/VP8L');
+  return { parts, hasAlpha };
+}
+/**
+ * Construye un WebP ANIMADO muxeando frames WebP estáticos (p.ej. de canvas.toBlob).
+ * frames: [{ bytes: Uint8Array|ArrayBuffer (webp estático completo), delayMs }]
+ * Duración ANMF en milisegundos (así lo define la spec del contenedor WebP).
+ */
+function buildAnimatedWebP(frames, W, H, loopCount) {
+  let anyAlpha = false;
+  const u24 = (arr, v) => { arr.push(v & 255, (v >> 8) & 255, (v >> 16) & 255); };
+  const anmfs = frames.map(f => {
+    const buf = f.bytes instanceof Uint8Array ? f.bytes.buffer.slice(f.bytes.byteOffset, f.bytes.byteOffset + f.bytes.byteLength) : f.bytes;
+    const { parts, hasAlpha } = extractWebPFrameChunks(buf);
+    anyAlpha = anyAlpha || hasAlpha;
+    const head = [];
+    u24(head, 0); u24(head, 0);            // X/2, Y/2
+    u24(head, W - 1); u24(head, H - 1);    // dimensiones del frame
+    u24(head, Math.max(Math.round(f.delayMs || 100), 10)); // duración ms
+    head.push(0x02);                        // flags: no-blend (frames ya compuestos), no dispose
+    let size = 16;
+    parts.forEach(p => size += p.length);
+    return { head, parts, size };
+  });
+  const out = [];
+  const pushStr = s => { for (const c of s) out.push(c.charCodeAt(0)); };
+  const push32 = v => { out.push(v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255); };
+  pushStr('RIFF'); push32(0); pushStr('WEBP');
+  pushStr('VP8X'); push32(10);
+  out.push(0x02 | (anyAlpha ? 0x10 : 0), 0, 0, 0); // flags: animation (+alpha)
+  u24(out, W - 1); u24(out, H - 1);
+  pushStr('ANIM'); push32(6); push32(0); // bg color
+  out.push(loopCount & 255, (loopCount >> 8) & 255);
+  for (const a of anmfs) {
+    pushStr('ANMF'); push32(a.size);
+    for (const x of a.head) out.push(x);
+    for (const p of a.parts) for (let i = 0; i < p.length; i++) out.push(p[i]);
+    if (a.size & 1) out.push(0);
+  }
+  const res = new Uint8Array(out);
+  const rs = res.length - 8;
+  res[4] = rs & 255; res[5] = (rs >> 8) & 255; res[6] = (rs >> 16) & 255; res[7] = (rs >>> 24) & 255;
+  return res;
+}
+
+// ---------- Lector ZIP (descompresión con DecompressionStream nativo) ----------
+/**
+ * Lista las entradas de un ZIP leyendo el End Of Central Directory + Central Directory.
+ * Devuelve [{ name, method, compStart, compSize, uncompSize }]. Sin soporte de cifrado/ZIP64.
+ */
+function listZipEntries(buffer) {
+  const v = new DataView(buffer);
+  const len = buffer.byteLength;
+  // EOCD: buscar firma 0x06054b50 desde el final (comentario máx 64KB)
+  let eocd = -1;
+  for (let i = len - 22; i >= Math.max(0, len - 22 - 65535); i--) {
+    if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('ZIP sin End Of Central Directory — archivo corrupto');
+  let count = v.getUint16(eocd + 10, true);
+  let off = v.getUint32(eocd + 16, true);
+  // ZIP64: si los valores están saturados, leer el EOCD64 (vía su locator, 20 bytes antes)
+  if (count === 0xFFFF || off === 0xFFFFFFFF) {
+    const locAt = eocd - 20;
+    if (locAt >= 0 && v.getUint32(locAt, true) === 0x07064b50) {
+      const e64 = Number(v.getBigUint64(locAt + 8, true));
+      if (e64 + 56 <= len && v.getUint32(e64, true) === 0x06064b50) {
+        count = Number(v.getBigUint64(e64 + 32, true));
+        off = Number(v.getBigUint64(e64 + 48, true));
+      }
+    }
+  }
+  const decoder = new TextDecoder();
+  const entries = [];
+  for (let n = 0; n < count; n++) {
+    if (off + 46 > len || v.getUint32(off, true) !== 0x02014b50) break;
+    const flags = v.getUint16(off + 8, true);
+    const method = v.getUint16(off + 10, true);
+    let compSize = v.getUint32(off + 20, true);
+    let uncompSize = v.getUint32(off + 24, true);
+    const nameLen = v.getUint16(off + 28, true);
+    const extraLen = v.getUint16(off + 30, true);
+    const commentLen = v.getUint16(off + 32, true);
+    let localOff = v.getUint32(off + 42, true);
+    // Campo extra ZIP64 (id 0x0001): valores reales de los campos saturados a 0xFFFFFFFF,
+    // en orden fijo: uncompSize, compSize, localOffset (solo los que estén saturados)
+    let ep = off + 46 + nameLen;
+    const eEnd = Math.min(ep + extraLen, len);
+    while (ep + 4 <= eEnd) {
+      const id = v.getUint16(ep, true);
+      const sz = v.getUint16(ep + 2, true);
+      if (id === 0x0001) {
+        let fp = ep + 4;
+        if (uncompSize === 0xFFFFFFFF && fp + 8 <= eEnd) { uncompSize = Number(v.getBigUint64(fp, true)); fp += 8; }
+        if (compSize === 0xFFFFFFFF && fp + 8 <= eEnd) { compSize = Number(v.getBigUint64(fp, true)); fp += 8; }
+        if (localOff === 0xFFFFFFFF && fp + 8 <= eEnd) { localOff = Number(v.getBigUint64(fp, true)); fp += 8; }
+      }
+      ep += 4 + sz;
+    }
+    const name = decoder.decode(new Uint8Array(buffer, off + 46, nameLen));
+    if (!(flags & 0x01) && !name.endsWith('/') && localOff + 30 <= len) { // sin cifrar, no directorio
+      // El header local repite name/extra con longitudes propias
+      const lNameLen = v.getUint16(localOff + 26, true);
+      const lExtraLen = v.getUint16(localOff + 28, true);
+      entries.push({ name, method, compStart: localOff + 30 + lNameLen + lExtraLen, compSize, uncompSize });
+    }
+    off += 46 + nameLen + extraLen + commentLen;
+  }
+  return entries;
+}
+/** Extrae una entrada: store directo; deflate vía DecompressionStream('deflate-raw'). */
+async function extractZipEntry(buffer, entry) {
+  if (entry.compStart + entry.compSize > buffer.byteLength) throw new Error('entrada fuera de rango — ZIP truncado o variante no soportada');
+  const comp = new Uint8Array(buffer, entry.compStart, entry.compSize);
+  if (entry.method === 0) return comp.slice();
+  if (entry.method !== 8) throw new Error('Método de compresión ' + entry.method + ' no soportado (solo store/deflate)');
+  if (typeof DecompressionStream === 'undefined') throw new Error('DecompressionStream no disponible en este navegador');
+  const ds = new DecompressionStream('deflate-raw');
+  const stream = new Blob([comp]).stream().pipeThrough(ds);
+  const buf = await new Response(stream).arrayBuffer();
+  return new Uint8Array(buf);
+}
+
+// ---------- Muxer WebM (EBML) para WebCodecs VideoEncoder ----------
+// Permite codificar más rápido que tiempo real: VideoEncoder (acelerado por
+// hardware cuando está disponible) produce chunks VP8/VP9 y aquí se muxean.
+function _vint(n) {
+  let len = 1;
+  while (n >= Math.pow(2, 7 * len) - 1 && len < 8) len++;
+  const b = new Uint8Array(len);
+  let val = n;
+  for (let i = len - 1; i >= 0; i--) { b[i] = val & 0xFF; val = Math.floor(val / 256); }
+  b[0] |= (0x80 >> (len - 1));
+  return b;
+}
+function _ebml(id, payload) {
+  const sz = _vint(payload.length);
+  const out = new Uint8Array(id.length + sz.length + payload.length);
+  out.set(id, 0); out.set(sz, id.length); out.set(payload, id.length + sz.length);
+  return out;
+}
+function _cat(arrs) {
+  let n = 0; arrs.forEach(a => n += a.length);
+  const o = new Uint8Array(n); let p = 0;
+  arrs.forEach(a => { o.set(a, p); p += a.length; });
+  return o;
+}
+function _uintBE(n) {
+  if (n === 0) return new Uint8Array([0]);
+  const b = []; let v = n;
+  while (v > 0) { b.unshift(v & 0xFF); v = Math.floor(v / 256); }
+  return new Uint8Array(b);
+}
+function _f64(f) { const b = new ArrayBuffer(8); new DataView(b).setFloat64(0, f, false); return new Uint8Array(b); }
+function _str(s) { const b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i); return b; }
+/**
+ * Construye un WebM válido. codecId: 'V_VP8'|'V_VP9'.
+ * blocks: [{ data: Uint8Array, key: bool, timestampMs }] ordenados.
+ */
+function buildWebM(codecId, W, H, blocks, durationMs) {
+  const ID = {
+    EBML: [0x1A,0x45,0xDF,0xA3], EBMLVersion: [0x42,0x86], EBMLReadVersion: [0x42,0xF7],
+    EBMLMaxIDLength: [0x42,0xF2], EBMLMaxSizeLength: [0x42,0xF3], DocType: [0x42,0x82],
+    DocTypeVersion: [0x42,0x87], DocTypeReadVersion: [0x42,0x85],
+    Segment: [0x18,0x53,0x80,0x67], Info: [0x15,0x49,0xA9,0x66], TimecodeScale: [0x2A,0xD7,0xB1],
+    MuxingApp: [0x4D,0x80], WritingApp: [0x57,0x41], Duration: [0x44,0x89],
+    Tracks: [0x16,0x54,0xAE,0x6B], TrackEntry: [0xAE], TrackNumber: [0xD7], TrackUID: [0x73,0xC5],
+    TrackType: [0x83], CodecID: [0x86], Video: [0xE0], PixelWidth: [0xB0], PixelHeight: [0xBA],
+    Cluster: [0x1F,0x43,0xB6,0x75], Timecode: [0xE7], SimpleBlock: [0xA3],
+  };
+  const header = _ebml(ID.EBML, _cat([
+    _ebml(ID.EBMLVersion, _uintBE(1)), _ebml(ID.EBMLReadVersion, _uintBE(1)),
+    _ebml(ID.EBMLMaxIDLength, _uintBE(4)), _ebml(ID.EBMLMaxSizeLength, _uintBE(8)),
+    _ebml(ID.DocType, _str('webm')), _ebml(ID.DocTypeVersion, _uintBE(2)), _ebml(ID.DocTypeReadVersion, _uintBE(2)),
+  ]));
+  // TimecodeScale 1.000.000 ns = timestamps en milisegundos
+  const info = _ebml(ID.Info, _cat([
+    _ebml(ID.TimecodeScale, _uintBE(1000000)),
+    _ebml(ID.Duration, _f64(Math.max(durationMs, 1))),
+    _ebml(ID.MuxingApp, _str('webpforge')), _ebml(ID.WritingApp, _str('webpforge')),
+  ]));
+  const tracks = _ebml(ID.Tracks, _ebml(ID.TrackEntry, _cat([
+    _ebml(ID.TrackNumber, _uintBE(1)), _ebml(ID.TrackUID, _uintBE(1)), _ebml(ID.TrackType, _uintBE(1)),
+    _ebml(ID.CodecID, _str(codecId)),
+    _ebml(ID.Video, _cat([_ebml(ID.PixelWidth, _uintBE(W)), _ebml(ID.PixelHeight, _uintBE(H))])),
+  ])));
+  // Clusters: nuevo en cada keyframe o cada ~5s (timecode relativo es int16)
+  const clusters = [];
+  let cur = null, curTc = 0;
+  for (const b of blocks) {
+    const ts = Math.round(b.timestampMs);
+    if (!cur || (b.key && ts - curTc > 0) || ts - curTc > 5000) {
+      if (cur) clusters.push(_ebml(ID.Cluster, _cat(cur)));
+      curTc = ts;
+      cur = [_ebml(ID.Timecode, _uintBE(ts))];
+    }
+    const rel = ts - curTc;
+    const sb = new Uint8Array(4 + b.data.length);
+    sb[0] = 0x81; // track 1 (vint)
+    sb[1] = (rel >> 8) & 0xFF; sb[2] = rel & 0xFF; // int16 BE
+    sb[3] = b.key ? 0x80 : 0x00;
+    sb.set(b.data, 4);
+    cur.push(_ebml(ID.SimpleBlock, sb));
+  }
+  if (cur) clusters.push(_ebml(ID.Cluster, _cat(cur)));
+  const segment = _ebml(ID.Segment, _cat([info, tracks, ..._toArr(clusters)]));
+  return _cat([header, segment]);
+}
+function _toArr(a) { return a; }
 
 // ---------- Cuantización de color (median cut) ----------
 /**
@@ -379,5 +678,5 @@ function buildZip(entries, onProgress) {
 
 // Export para Node (tests); en navegador quedan como globals del script
 if (typeof module !== 'undefined') {
-  module.exports = { readFourCC, parseWebP, detectContainer, quantize, lzwEncode, buildGifBuffer, encodeBMP, buildZip, crc32 };
+  module.exports = { readFourCC, parseWebP, detectContainer, parseGIF, parsePNG, parseJPEG, parseBMP, buildAnimatedWebP, extractWebPFrameChunks, listZipEntries, extractZipEntry, buildWebM, quantize, lzwEncode, buildGifBuffer, encodeBMP, buildZip, crc32 };
 }

@@ -5,7 +5,7 @@
     <div class="logo-mark">⚡</div>
     <div>
       <h1>WEBP <b>FORGE</b></h1>
-      <small>WEBP · WEBM · MP4 → TODO FORMATO · 100% LOCAL</small>
+      <small>CONVIERTE TODO ↔ TODO · 100% LOCAL</small>
     </div>
   </div>
   <div id="api-status" title="Capacidades detectadas en este navegador"></div>
@@ -14,16 +14,16 @@
 
 <main>
   <!-- ZONA DE CARGA -->
-  <div id="dropzone" tabindex="0" role="button" aria-label="Zona para soltar archivos WebP">
+  <div id="dropzone" tabindex="0" role="button" aria-label="Zona para soltar imágenes, videos o ZIPs">
     <div class="dz-icon">📥</div>
-    <h2>Arrastra tus archivos WebP, WebM o MP4 aquí</h2>
-    <p>Sin límite de archivos · acepta carpetas completas y videos · todo se procesa en tu equipo, nada se sube a internet</p>
+    <h2>Arrastra tus imágenes, videos o ZIPs aquí</h2>
+    <p>WebP · GIF · PNG · JPG · BMP · WebM · MP4 · ZIP — sin límite de archivos · acepta carpetas completas · nada se sube a internet</p>
     <div class="dz-buttons">
       <button class="btn btn-primary" id="btn-pick">📂 Seleccionar archivos</button>
       <button class="btn" id="btn-pick-dir">🗂 Seleccionar carpeta</button>
     </div>
     <div id="analyze-progress"></div>
-    <input type="file" id="file-input" accept=".webp,.webm,.mp4,.m4v,image/webp,video/webm,video/mp4" multiple hidden>
+    <input type="file" id="file-input" accept=".webp,.webm,.mp4,.m4v,.gif,.png,.jpg,.jpeg,.bmp,.zip,image/webp,image/gif,image/png,image/jpeg,image/bmp,video/webm,video/mp4,application/zip" multiple hidden>
     <input type="file" id="dir-input" webkitdirectory hidden>
   </div>
 
@@ -34,7 +34,7 @@
       Convertir seleccionados a:
       <select id="global-format">
         <option value="">— por archivo —</option>
-        <option value="jpg">JPG</option><option value="png">PNG</option><option value="gif">GIF</option>
+        <option value="webp">WebP</option><option value="jpg">JPG</option><option value="png">PNG</option><option value="gif">GIF</option>
         <option value="mp4">MP4</option><option value="webm">WebM</option><option value="bmp">BMP</option>
       </select>
     </label>
@@ -44,6 +44,12 @@
     <input type="search" id="search" placeholder="🔍 Buscar archivo…">
     <label style="display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;color:var(--text-2)" title="Conversiones simultáneas">
       ∥ <select id="parallel"><option>1</option><option>2</option><option selected>4</option><option>6</option></select>
+    </label>
+    <label class="opt" title="Aceleración por hardware: usa el encoder de video de tu tarjeta gráfica (WebCodecs) para codificar WebM mucho más rápido que tiempo real. Desactívalo para usar el método clásico.">
+      <input type="checkbox" id="opt-gpu" checked> ⚡ GPU
+    </label>
+    <label class="opt" title="Fidelidad máxima: las conversiones de video a GIF/WebP animado mantienen la resolución ORIGINAL, sin reescalado. Con videos 4K o muy largos puede consumir mucha RAM.">
+      <input type="checkbox" id="opt-fidelity" checked> 🎯 Fidelidad máx.
     </label>
     <button class="btn btn-sm btn-danger" id="btn-clear" title="Quitar todos los archivos de la lista">🗑 Limpiar</button>
   </div>
@@ -87,7 +93,7 @@
       <button class="btn btn-sm" id="modal-close">✕ Cerrar</button>
     </div>
     <div class="compare">
-      <div class="pane"><h5>ORIGINAL (WEBP)</h5><div id="pane-orig"></div><div class="sz" id="sz-orig"></div></div>
+      <div class="pane"><h5 id="pane-orig-title">ORIGINAL</h5><div id="pane-orig"></div><div class="sz" id="sz-orig"></div></div>
       <div class="pane"><h5 id="pane-res-title">RESULTADO</h5><div id="pane-res"></div><div class="sz" id="sz-res"></div></div>
     </div>
   </div>

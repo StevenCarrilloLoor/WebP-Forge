@@ -88,6 +88,30 @@ NOVEDADES v1.1 (a partir de feedback de uso real)
 - Formato por defecto corregido: lo clasificado como VIDEO (webp animado
   >10s o archivo de video) ahora propone MP4 (o WebM como fallback), ya no GIF.
 
+NOVEDADES v1.2 — CONVERTIDOR UNIVERSAL + ACELERACIÓN
+- Entradas nuevas: GIF (estático y animado), PNG, JPG, BMP y ZIP. La
+  detección sigue siendo por magic bytes, nunca por extensión. Parsers
+  binarios propios: bloques GIF (frames/delays/NETSCAPE loop), IHDR de PNG,
+  segmentos SOF de JPEG (robusto ante EXIF), header BMP.
+- Salida WebP: estática vía canvas (toBlob image/webp con calidad) y
+  ANIMADA con un muxer VP8X/ANIM/ANMF en JS puro: cada frame se codifica a
+  WebP estático con el encoder nativo del navegador y se extrae su bitstream
+  (chunks ALPH/VP8/VP8L) para ensamblar el contenedor animado. Validado
+  contra el decoder de Pillow (frames, dimensiones y duraciones exactas).
+- GIF animado → WebP animado por defecto (el caso ezgif clásico, 100% local).
+- ZIP de entrada: parser de Central Directory propio + descompresión con
+  DecompressionStream('deflate-raw') NATIVO del navegador (C++ por debajo,
+  sin librerías). Extrae solo los archivos compatibles y los añade a la lista.
+- ⚡ ACELERACIÓN: WebM de salida usa WebCodecs VideoEncoder (encoder por
+  HARDWARE cuando el sistema lo ofrece) + muxer EBML/Matroska escrito a
+  mano — ya no está atado a tiempo real: una animación de 60s se codifica
+  en segundos. El muxer fue validado decodificando su salida con ffmpeg.
+  Cada resultado se auto-VALIDA decodificándolo en un <video>; si algo
+  falla, fallback transparente a MediaRecorder. MP4 sigue en tiempo real
+  (un muxer ISO BMFF correcto es otro proyecto; WebM cubre el caso rápido).
+- Decodificación: ImageDecoder ahora también para image/gif (frame a frame
+  con delays reales); imágenes estáticas por createImageBitmap (GPU).
+
 QUÉ MEJORARÍA CON MÁS TIEMPO / BACKEND
 - Muxer MP4 (ISO BMFF) + WebCodecs para codificar video más rápido que
   tiempo real y con control de bitrate exacto.

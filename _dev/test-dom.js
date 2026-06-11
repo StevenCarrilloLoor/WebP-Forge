@@ -43,7 +43,8 @@ const check = (name, cond, extra) => {
   const $$ = (s) => [...window.document.querySelectorAll(s)];
 
   // Chips de API renderizados
-  check('chips de API', $$('#api-status .chip').length === 5);
+  check('chips de API', $$('#api-status .chip').length === 6);
+  check('chip WebP-out off (jsdom)', $('#api-status').textContent.includes('✗ WebP-out'));
   check('chip ImageDecoder off', $('#api-status').textContent.includes('✗ ImageDecoder'));
 
   // Cargar archivos reales de prueba
@@ -51,16 +52,16 @@ const check = (name, cond, extra) => {
     const buf = fs.readFileSync(path.join('test-assets', p));
     return new window.File([buf], p, { type: 'image/webp' });
   };
-  const files = [mkFile('lossy.webp'), mkFile('lossless.webp'), mkFile('animated.webp'), mkFile('fake.webp'), mkFile('video.webm')];
+  const files = [mkFile('lossy.webp'), mkFile('lossless.webp'), mkFile('animated.webp'), mkFile('fake.webp'), mkFile('video.webm'), mkFile('photo.jpg'), mkFile('anim.gif')];
   await window.addFiles(files);
 
-  check('5 tarjetas creadas', $$('.card').length === 5);
+  check('7 tarjetas creadas', $$('.card').length === 7);
   check('badge lossy', $$('.badge.static').some(b => b.textContent.includes('LOSSY')));
   check('badge lossless', $$('.badge.static').some(b => b.textContent.includes('LOSSLESS')));
   check('badge animado 12 frames', $$('.badge.anim').some(b => b.textContent.includes('12 frames')));
   check('badge inválido', $$('.badge.invalid').length === 1);
   check('error descriptivo en inválido', window.document.body.textContent.includes('Firma RIFF ausente'));
-  check('contador global', $('#global-counter').textContent.includes('5'));
+  check('contador global', $('#global-counter').textContent.includes('7'));
   check('controles visibles', $('#controls').style.display === 'flex');
   check('metadatos dims', window.document.body.textContent.includes('320×200'));
   check('metadatos frames+loop', window.document.body.textContent.includes('loop ∞'));
@@ -70,16 +71,34 @@ const check = (name, cond, extra) => {
   check('kind video', vEntry && vEntry.kind === 'video');
   check('default video=gif (sin MediaRecorder en jsdom)', vEntry && vEntry.format === 'gif');
   check('filtro video cuenta 1', (() => { const chip=[...window.document.querySelectorAll('.filter-chip')].find(c=>c.dataset.f==='video'); return chip.querySelector('.n').textContent==='(1)'; })());
+  // Entradas universales: JPG y GIF animado
+  check('badge JPEG', $$('.badge.static').some(b => b.textContent.includes('JPEG')));
+  check('badge GIF ANIMADO 8 frames', $$('.badge.anim').some(b => b.textContent.includes('GIF ANIMADO') && b.textContent.includes('8 frames')));
+  const jpgE = [...window.WEBPFORGE.FILES.values()].find(e => e.name === 'photo.jpg');
+  check('jpg kind image + dims', jpgE && jpgE.kind === 'image' && jpgE.info.width === 300 && jpgE.info.height === 180);
+  check('default jpg=png (jsdom sin encoder webp)', jpgE && jpgE.format === 'png');
+  const gifE = [...window.WEBPFORGE.FILES.values()].find(e => e.name === 'anim.gif');
+  check('gif kind gif + loop ∞', gifE && gifE.kind === 'gif' && gifE.info.loopCount === 0 && gifE.info.frames === 8);
+  check('default gif=gif (jsdom sin webp/mp4/webm)', gifE && gifE.format === 'gif');
+  check('selector incluye WebP', $$('.fmt-select option').some(o => o.value === 'webp'));
 
   // Formato por defecto: animado→gif, estático→png
   const entries = [...window.WEBPFORGE.FILES.values()];
   check('default animado=gif', entries.find(e => e.name === 'animated.webp').format === 'gif');
-  check('default estático=png', entries.find(e => e.name === 'lossy.webp').format === 'png');
+  check('default webp estático=png (máx calidad)', entries.find(e => e.name === 'lossy.webp').format === 'png');
+  check('default lossless=png', entries.find(e => e.name === 'lossless.webp').format === 'png');
+  check('calidad por defecto 100%', entries.every(e => e.quality === 100));
+  check('slider muestra 100%', window.document.body.textContent.includes('100%'));
+  check('toggle GPU existe y activo', $('#opt-gpu') && $('#opt-gpu').checked);
+  check('toggle fidelidad existe y activo', $('#opt-fidelity') && $('#opt-fidelity').checked);
+  $('#opt-gpu').checked = false;
+  $('#opt-gpu').dispatchEvent(new window.Event('change', { bubbles: true }));
+  check('toggle GPU desactiva SETTINGS', window.WEBPFORGE.SETTINGS && window.WEBPFORGE.SETTINGS.gpu === false);
 
   // Filtros
   window.document.querySelector('[data-f=anim]').click();
   const visibles = $$('.card').filter(c => c.style.display !== 'none').length;
-  check('filtro animados', visibles === 1);
+  check('filtro animados (webp+gif)', visibles === 2);
   window.document.querySelector('[data-f=error]').click();
   check('filtro error', $$('.card').filter(c => c.style.display !== 'none').length === 1);
   window.document.querySelector('[data-f=all]').click();
@@ -107,7 +126,7 @@ const check = (name, cond, extra) => {
   // Quitar archivo
   const before = $$('.card').length;
   window.document.querySelector('.card .card-x').click();
-  check('quitar archivo', $$('.card').length === before - 1 && window.WEBPFORGE.FILES.size === 4);
+  check('quitar archivo', $$('.card').length === before - 1 && window.WEBPFORGE.FILES.size === 6);
 
   // Detección directa adicional (header parcial + fullSize)
   const buf = fs.readFileSync('test-assets/animated.webp');
