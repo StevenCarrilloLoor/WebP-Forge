@@ -1,12 +1,16 @@
 @echo off
+rem ============================================
+rem  USO DIARIO - Abre la aplicacion
+rem ============================================
 setlocal
 title WEBP FORGE
-set "APP=%~dp0webp-forge.html"
+set "APP=%~dp0..\webp-forge.html"
 if not exist "%APP%" (
-  echo No se encontro webp-forge.html junto a este lanzador.
+  echo No se encontro webp-forge.html en la carpeta del proyecto.
   pause
   exit /b 1
 )
+for %%I in ("%APP%") do set "APP=%%~fI"
 set "URL=file:///%APP:\=/%"
 rem --- Chrome en modo app (ventana propia) ---
 for %%P in ("%ProgramFiles%\Google\Chrome\Application\chrome.exe" "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" "%LocalAppData%\Google\Chrome\Application\chrome.exe") do (

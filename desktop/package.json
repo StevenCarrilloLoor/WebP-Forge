@@ -2,7 +2,7 @@
   "name": "webp-forge",
   "productName": "WebP Forge",
   "description": "Convertidor universal de imágenes y video — 100% local",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "private": true,
   "author": "Steven Carrillo <stevencarrilloloor@gmail.com>",
   "repository": {
@@ -59,7 +59,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
+      "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
       "shortcutName": "WebP Forge",
       "artifactName": "WebP-Forge-Setup-${version}.exe"

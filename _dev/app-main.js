@@ -32,6 +32,10 @@ if (CAP.mediaRecorder) {
 }
 // ¿Puede el canvas exportar WebP? (Chrome/Edge/Opera sí; Firefox/Safari no)
 try { CAP.webpEnc = document.createElement('canvas').toDataURL('image/webp').startsWith('data:image/webp'); } catch { CAP.webpEnc = false; }
+// Electron NO incluye el encoder H.264 (licencias): isTypeSupported('video/mp4')
+// devuelve true pero MediaRecorder no produce datos. Desconfiar de MP4 ahi.
+const IS_ELECTRON = /\bElectron\b/i.test(navigator.userAgent);
+if (IS_ELECTRON) { CAP.mp4 = false; CAP.mp4Mime = ''; CAP.mp4AudioMime = ''; }
 
 // ---------- Estado ----------
 const FILES = new Map();      // id -> entry
@@ -643,7 +647,14 @@ async function videoToVideo(entry, wantMp4, onProg) {
     rec.stop();
     await stopped;
     stream.getTracks().forEach(t => t.stop());
-    if (!chunks.length) throw new Error('MediaRecorder no produjo datos — códec posiblemente no soportado');
+    if (!chunks.length) {
+      if (useMp4 && CAP.webm) {
+        // El encoder MP4 no existe realmente (típico de Electron): reintento en WebM
+        const r = await videoToVideo(entry, false, onProg);
+        return { ...r, fellBack: true };
+      }
+      throw new Error('MediaRecorder no produjo datos — códec posiblemente no soportado');
+    }
     return { blob: new Blob(chunks, { type: mime.split(';')[0] }), ext, fellBack: wantMp4 && !useMp4 };
   } finally { URL.revokeObjectURL(url); }
 }
@@ -726,7 +737,14 @@ async function framesToVideo(frames, w, h, wantMp4, onProg) {
   rec.stop();
   await stopped;
   track.stop();
-  if (!chunks.length) throw new Error('MediaRecorder no produjo datos — códec posiblemente no soportado');
+  if (!chunks.length) {
+    if (useMp4 && CAP.webm) {
+      // El encoder MP4 no existe realmente (típico de Electron): reintento en WebM
+      const r = await framesToVideo(frames, w, h, false, onProg);
+      return { ...r, fellBack: true };
+    }
+    throw new Error('MediaRecorder no produjo datos — códec posiblemente no soportado');
+  }
   return { blob: new Blob(chunks, { type: mime.split(';')[0] }), ext, fellBack: wantMp4 && !useMp4 };
 }
 
@@ -1261,4 +1279,4 @@ window.addEventListener('beforeunload', () => {
 });
 
 // Hook de depuración/integración (consola): window.WEBPFORGE
-window.WEBPFORGE = { version: '1.4.0', SETTINGS, FILES, CAP, addFiles, parseWebP, detectContainer };
+window.WEBPFORGE = { version: '1.4.1', SETTINGS, FILES, CAP, addFiles, parseWebP, detectContainer };
