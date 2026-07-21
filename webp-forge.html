@@ -1659,6 +1659,26 @@ async function detectGPU() {
       }
     }
   } catch {}
+  // ¿Hay H.264 vía WebCodecs? Permite MP4 REAL incluso donde MediaRecorder no
+  // lo graba (p. ej. Electron con encoder por hardware de la GPU).
+  CAP.mp4Fast = false;
+  try {
+    if (typeof VideoEncoder !== 'undefined') {
+      for (const c of ['avc1.640033', 'avc1.4D0033', 'avc1.42E01E']) {
+        const s = await VideoEncoder.isConfigSupported({ codec: c, width: 1280, height: 720, avc: { format: 'avc' } });
+        if (s && s.supported) { CAP.mp4Fast = true; break; }
+      }
+    }
+  } catch {}
+  if (CAP.mp4Fast && !CAP.mp4) {
+    const chip = [...document.querySelectorAll('#api-status .chip')].find(c => c.textContent.trim().endsWith('MP4'));
+    if (chip) {
+      chip.classList.remove('off');
+      chip.classList.add('on');
+      chip.textContent = '✓ MP4';
+      chip.title = 'MP4 disponible vía WebCodecs H.264 (muxer propio, acelerado). MediaRecorder no lo graba en este entorno, pero la app no lo necesita.';
+    }
+  }
   CAP.gpuName = pretty;
   CAP.hwEncode = hwEncode;
   const short = pretty ? (pretty.length > 26 ? pretty.slice(0, 24) + '…' : pretty) : 'GPU no identificada';
@@ -1741,16 +1761,17 @@ function probeVideo(file) {
 function defaultFormatFor(entry) {
   if (sessionPrefs.format) return sessionPrefs.format;
   const i = entry.info;
+  const mp4Ok = CAP.mp4 || CAP.mp4Fast; // MediaRecorder O WebCodecs H.264
   if (entry.kind === 'video') {
     // Convertir al "otro" contenedor por defecto; MP4 es lo más universal
-    if (i.type !== 'mp4' && CAP.mp4) return 'mp4';
+    if (i.type !== 'mp4' && mp4Ok) return 'mp4';
     if (i.type === 'mp4' && CAP.webm) return 'webm';
-    return CAP.mp4 ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
+    return mp4Ok ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
   }
   if (entry.kind === 'gif') {
     // GIF animado → WebP animado (mucho más pequeño); sin encoder WebP → video
     if (CAP.webpEnc) return 'webp';
-    return CAP.mp4 ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
+    return mp4Ok ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
   }
   if (entry.kind === 'image') {
     // Imagen "normal" → WebP es la conversión típica
@@ -1759,7 +1780,7 @@ function defaultFormatFor(entry) {
   }
   // Entrada WebP
   if (i.animated) {
-    if (i.durationMs > 10000) return CAP.mp4 ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
+    if (i.durationMs > 10000) return mp4Ok ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
     return 'gif';
   }
   // Estático → PNG siempre: política de MÁXIMA CALIDAD (preferencia del usuario).
@@ -2009,7 +2030,7 @@ $('#list').addEventListener('change', (e) => {
     entry.format = e.target.value;
     sessionPrefs.format = '';
     entry.els.qwrap.style.display = ['jpg','webp'].includes(entry.format) ? '' : 'none';
-    if ((entry.format === 'mp4' && !CAP.mp4 && CAP.webm)) toast('Este navegador no graba MP4 — se generará <b>WebM</b> como fallback', 'warn');
+    if ((entry.format === 'mp4' && !CAP.mp4 && !CAP.mp4Fast && CAP.webm)) toast('Este navegador no graba MP4 — se generará <b>WebM</b> como fallback', 'warn');
   }
 });
 $('#list').addEventListener('input', (e) => {
@@ -2830,7 +2851,7 @@ $('#global-format').addEventListener('change', (e) => {
     if (en.els.fmt) en.els.fmt.value = f;
     if (en.els.qwrap) en.els.qwrap.style.display = ['jpg','webp'].includes(f) ? '' : 'none';
   }
-  if (f === 'mp4' && !CAP.mp4 && CAP.webm) toast('Este navegador no graba MP4 — se generará <b>WebM</b> como fallback', 'warn');
+  if (f === 'mp4' && !CAP.mp4 && !CAP.mp4Fast && CAP.webm) toast('Este navegador no graba MP4 — se generará <b>WebM</b> como fallback', 'warn');
 });
 $('#btn-convert').addEventListener('click', () => {
   if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
