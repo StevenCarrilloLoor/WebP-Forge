@@ -1644,10 +1644,11 @@ async function detectGPU() {
     if (gl) {
       const ext = gl.getExtension('WEBGL_debug_renderer_info');
       const r = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER) || '');
-      // Preferir el nombre de la GPU DEDICADA si aparece; si no, el más largo
+      // Preferir el nombre de la GPU DEDICADA si aparece y, entre candidatos
+      // equivalentes, el MÁS DESCRIPTIVO (WebGPU a veces solo da "nvidia")
       const esDedicada = /NVIDIA|GeForce|RTX|GTX|Radeon(?! .*Graphics)/i;
-      if (esDedicada.test(r) && !esDedicada.test(name)) name = r;
-      else if (r.length > name.length && !esDedicada.test(name)) name = r;
+      if (esDedicada.test(r) && (!esDedicada.test(name) || r.length > name.length)) name = r;
+      else if (!esDedicada.test(name) && r.length > name.length) name = r;
     }
   } catch {}
   // Limpiar envoltorio ANGLE y sufijos de API: "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 Direct3D11...)" → "NVIDIA GeForce RTX 5080"
