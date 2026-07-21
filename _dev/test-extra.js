@@ -37,7 +37,8 @@ const check = (n, c, x) => { if (c) { pass++; console.log('PASS', n); } else { f
   // WebM con frames VP8 reales del IVF generado por ffmpeg
   const ivf = new Uint8Array(load('frames.ivf'));
   const iv = new DataView(ivf.buffer);
-  const num = iv.getUint32(24, true), den = iv.getUint32(16, true);
+  // Cabecera IVF: rate (denominador) en el offset 16, scale (numerador) en el 20
+  const den = iv.getUint32(16, true), num = iv.getUint32(20, true);
   let pos = 32; const blocks = [];
   while (pos + 12 <= ivf.length) {
     const sz = iv.getUint32(pos, true);

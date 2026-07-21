@@ -112,9 +112,32 @@ NOVEDADES v1.2 — CONVERTIDOR UNIVERSAL + ACELERACIÓN
 - Decodificación: ImageDecoder ahora también para image/gif (frame a frame
   con delays reales); imágenes estáticas por createImageBitmap (GPU).
 
+NOVEDADES v1.5 — SEEK CORRECTO EN VIDEO + MP4 REAL + REDISEÑO
+- BUG RESUELTO (reportado en uso real): los videos generados "se reiniciaban"
+  al saltar a un punto. Causa: MediaRecorder emite video de STREAMING
+  (duración ∞, sin índice de seek) y el muxer WebM propio no escribía Cues.
+- El muxer WebM ahora emite SeekHead + Duration + Cues; los CuePoints solo
+  apuntan a clusters que empiezan con keyframe de video (apuntar a un cluster
+  sin keyframe rompe la decodificación tras el salto).
+- remuxWebM: parser EBML propio que repara la salida de MediaRecorder SIN
+  re-codificar (soporta Segment/Clusters de tamaño desconocido, conserva la
+  pista de audio, recalcula la duración desde los bloques). Validado con
+  ffmpeg/ffprobe (duración, seek y conteo de frames exactos).
+- MP4 de verdad: muxer ISO BMFF progresivo propio (ftyp + moov con
+  stts/stss/stsc/stsz/stco + mdat, faststart) + WebCodecs H.264
+  (prefer-hardware) → WebP/GIF a MP4 más rápido que tiempo real y con seek
+  perfecto. remuxMP4 convierte el MP4 fragmentado de MediaRecorder (moof) a
+  progresivo copiando los samples byte a byte, audio incluido.
+- validateVideoBlob ahora exige duración FINITA además de decodificar: un
+  video sin duración ya no se da por bueno.
+- Rediseño completo de la UI: paleta slate + acento cian, grid responsivo de
+  tarjetas (2 columnas en pantallas anchas), dropzone que se compacta al
+  cargar archivos, tarjetas con franja de estado, miniaturas @2x, modal y
+  toasts renovados. Misma estructura de IDs: los tests de DOM siguen pasando.
+
 QUÉ MEJORARÍA CON MÁS TIEMPO / BACKEND
-- Muxer MP4 (ISO BMFF) + WebCodecs para codificar video más rápido que
-  tiempo real y con control de bitrate exacto.
+- Re-codificación de video→video también por WebCodecs (hoy usa MediaRecorder
+  en tiempo real + remux; con VideoDecoder haría falta demuxear el origen).
 - Dithering Floyd-Steinberg opcional en el GIF (mejor degradado, más grano).
 - Decodificador VP8/VP8L propio en WASM para animados en Firefox/Safari.
 - streamsaver/File System Access API para ZIPs de varios GB sin mantenerlos

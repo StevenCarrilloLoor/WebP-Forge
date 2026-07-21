@@ -352,32 +352,84 @@ function _uintBE(n) {
 }
 function _f64(f) { const b = new ArrayBuffer(8); new DataView(b).setFloat64(0, f, false); return new Uint8Array(b); }
 function _str(s) { const b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i); return b; }
-/**
- * Construye un WebM válido. codecId: 'V_VP8'|'V_VP9'.
- * blocks: [{ data: Uint8Array, key: bool, timestampMs }] ordenados.
- */
-function buildWebM(codecId, W, H, blocks, durationMs) {
-  const ID = {
-    EBML: [0x1A,0x45,0xDF,0xA3], EBMLVersion: [0x42,0x86], EBMLReadVersion: [0x42,0xF7],
-    EBMLMaxIDLength: [0x42,0xF2], EBMLMaxSizeLength: [0x42,0xF3], DocType: [0x42,0x82],
-    DocTypeVersion: [0x42,0x87], DocTypeReadVersion: [0x42,0x85],
-    Segment: [0x18,0x53,0x80,0x67], Info: [0x15,0x49,0xA9,0x66], TimecodeScale: [0x2A,0xD7,0xB1],
-    MuxingApp: [0x4D,0x80], WritingApp: [0x57,0x41], Duration: [0x44,0x89],
-    Tracks: [0x16,0x54,0xAE,0x6B], TrackEntry: [0xAE], TrackNumber: [0xD7], TrackUID: [0x73,0xC5],
-    TrackType: [0x83], CodecID: [0x86], Video: [0xE0], PixelWidth: [0xB0], PixelHeight: [0xBA],
-    Cluster: [0x1F,0x43,0xB6,0x75], Timecode: [0xE7], SimpleBlock: [0xA3],
-  };
-  const header = _ebml(ID.EBML, _cat([
+function _uintFixed(n, len) {
+  const b = new Uint8Array(len);
+  let v = n;
+  for (let i = len - 1; i >= 0; i--) { b[i] = v & 0xFF; v = Math.floor(v / 256); }
+  return b;
+}
+const _WEBM_ID = {
+  EBML: [0x1A,0x45,0xDF,0xA3], EBMLVersion: [0x42,0x86], EBMLReadVersion: [0x42,0xF7],
+  EBMLMaxIDLength: [0x42,0xF2], EBMLMaxSizeLength: [0x42,0xF3], DocType: [0x42,0x82],
+  DocTypeVersion: [0x42,0x87], DocTypeReadVersion: [0x42,0x85],
+  Segment: [0x18,0x53,0x80,0x67], SeekHead: [0x11,0x4D,0x9B,0x74], Seek: [0x4D,0xBB],
+  SeekID: [0x53,0xAB], SeekPosition: [0x53,0xAC],
+  Info: [0x15,0x49,0xA9,0x66], TimecodeScale: [0x2A,0xD7,0xB1],
+  MuxingApp: [0x4D,0x80], WritingApp: [0x57,0x41], Duration: [0x44,0x89],
+  Tracks: [0x16,0x54,0xAE,0x6B], TrackEntry: [0xAE], TrackNumber: [0xD7], TrackUID: [0x73,0xC5],
+  TrackType: [0x83], CodecID: [0x86], Video: [0xE0], PixelWidth: [0xB0], PixelHeight: [0xBA],
+  Cluster: [0x1F,0x43,0xB6,0x75], Timecode: [0xE7], SimpleBlock: [0xA3],
+  Cues: [0x1C,0x53,0xBB,0x6B], CuePoint: [0xBB], CueTime: [0xB3],
+  CueTrackPositions: [0xB7], CueTrack: [0xF7], CueClusterPosition: [0xF1],
+};
+function _webmEbmlHeader() {
+  const ID = _WEBM_ID;
+  return _ebml(ID.EBML, _cat([
     _ebml(ID.EBMLVersion, _uintBE(1)), _ebml(ID.EBMLReadVersion, _uintBE(1)),
     _ebml(ID.EBMLMaxIDLength, _uintBE(4)), _ebml(ID.EBMLMaxSizeLength, _uintBE(8)),
     _ebml(ID.DocType, _str('webm')), _ebml(ID.DocTypeVersion, _uintBE(2)), _ebml(ID.DocTypeReadVersion, _uintBE(2)),
   ]));
-  // TimecodeScale 1.000.000 ns = timestamps en milisegundos
+}
+/**
+ * Ensambla un Segment WebM COMPLETO y buscable: SeekHead (posiciones fijas de
+ * 8 bytes) + Info con Duration + Tracks + Clusters + Cues (índice de seek).
+ * Sin Cues, los reproductores no pueden saltar a un punto y "reinician" el
+ * video — este era el bug de seek de las versiones anteriores.
+ * clusters: [{ tc: timecode absoluto en ticks, bytes: Uint8Array del elemento Cluster completo }]
+ */
+function _assembleWebM(opts) {
+  const ID = _WEBM_ID;
+  const timecodeScale = opts.timecodeScale || 1000000;
   const info = _ebml(ID.Info, _cat([
-    _ebml(ID.TimecodeScale, _uintBE(1000000)),
-    _ebml(ID.Duration, _f64(Math.max(durationMs, 1))),
+    _ebml(ID.TimecodeScale, _uintBE(timecodeScale)),
+    _ebml(ID.Duration, _f64(Math.max(opts.durationTicks, 1))),
     _ebml(ID.MuxingApp, _str('webpforge')), _ebml(ID.WritingApp, _str('webpforge')),
   ]));
+  const mkSeek = (idBytes, pos) => _ebml(ID.Seek, _cat([
+    _ebml(ID.SeekID, new Uint8Array(idBytes)),
+    _ebml(ID.SeekPosition, _uintFixed(pos, 8)), // 8 bytes fijos → tamaño de SeekHead estable
+  ]));
+  const seekHeadSize = _ebml(ID.SeekHead, _cat([mkSeek(ID.Info, 0), mkSeek(ID.Tracks, 0), mkSeek(ID.Cues, 0)])).length;
+  const posInfo = seekHeadSize;
+  const posTracks = posInfo + info.length;
+  let off = posTracks + opts.tracksBytes.length;
+  const cuePts = [];
+  for (const c of opts.clusters) {
+    // Solo se indexan clusters que EMPIEZAN con keyframe de video: apuntar un
+    // CuePoint a un cluster sin keyframe rompe la decodificación tras el salto.
+    if (c.cue !== false) cuePts.push({ time: Math.max(0, Math.round(c.tc)), pos: off });
+    off += c.bytes.length;
+  }
+  if (!cuePts.length && opts.clusters.length) cuePts.push({ time: Math.max(0, Math.round(opts.clusters[0].tc)), pos: posTracks + opts.tracksBytes.length });
+  const posCues = off;
+  const cues = _ebml(ID.Cues, _cat(cuePts.map(p => _ebml(ID.CuePoint, _cat([
+    _ebml(ID.CueTime, _uintBE(p.time)),
+    _ebml(ID.CueTrackPositions, _cat([
+      _ebml(ID.CueTrack, _uintBE(opts.videoTrackNum || 1)),
+      _ebml(ID.CueClusterPosition, _uintFixed(p.pos, 8)),
+    ])),
+  ])))));
+  const seekHead = _ebml(ID.SeekHead, _cat([mkSeek(ID.Info, posInfo), mkSeek(ID.Tracks, posTracks), mkSeek(ID.Cues, posCues)]));
+  if (seekHead.length !== seekHeadSize) throw new Error('SeekHead de tamaño inesperado');
+  const segment = _ebml(ID.Segment, _cat([seekHead, info, opts.tracksBytes, ...opts.clusters.map(c => c.bytes), cues]));
+  return _cat([_webmEbmlHeader(), segment]);
+}
+/**
+ * Construye un WebM válido y BUSCABLE. codecId: 'V_VP8'|'V_VP9'.
+ * blocks: [{ data: Uint8Array, key: bool, timestampMs }] ordenados.
+ */
+function buildWebM(codecId, W, H, blocks, durationMs) {
+  const ID = _WEBM_ID;
   const tracks = _ebml(ID.Tracks, _ebml(ID.TrackEntry, _cat([
     _ebml(ID.TrackNumber, _uintBE(1)), _ebml(ID.TrackUID, _uintBE(1)), _ebml(ID.TrackType, _uintBE(1)),
     _ebml(ID.CodecID, _str(codecId)),
@@ -385,12 +437,14 @@ function buildWebM(codecId, W, H, blocks, durationMs) {
   ])));
   // Clusters: nuevo en cada keyframe o cada ~5s (timecode relativo es int16)
   const clusters = [];
-  let cur = null, curTc = 0;
+  let cur = null, curTc = 0, curKey = false;
+  const flush = () => { if (cur) clusters.push({ tc: curTc, cue: curKey, bytes: _ebml(ID.Cluster, _cat(cur)) }); };
   for (const b of blocks) {
     const ts = Math.round(b.timestampMs);
     if (!cur || (b.key && ts - curTc > 0) || ts - curTc > 5000) {
-      if (cur) clusters.push(_ebml(ID.Cluster, _cat(cur)));
+      flush();
       curTc = ts;
+      curKey = !!b.key; // el primer bloque decide si el cluster puede llevar CuePoint
       cur = [_ebml(ID.Timecode, _uintBE(ts))];
     }
     const rel = ts - curTc;
@@ -401,11 +455,410 @@ function buildWebM(codecId, W, H, blocks, durationMs) {
     sb.set(b.data, 4);
     cur.push(_ebml(ID.SimpleBlock, sb));
   }
-  if (cur) clusters.push(_ebml(ID.Cluster, _cat(cur)));
-  const segment = _ebml(ID.Segment, _cat([info, tracks, ..._toArr(clusters)]));
-  return _cat([header, segment]);
+  flush();
+  // TimecodeScale 1.000.000 ns → ticks = milisegundos
+  return _assembleWebM({ tracksBytes: tracks, clusters, videoTrackNum: 1, durationTicks: Math.max(durationMs, 1), timecodeScale: 1000000 });
 }
-function _toArr(a) { return a; }
+
+// ---------- Lector EBML + remuxer WebM (arregla salidas de MediaRecorder) ----------
+// MediaRecorder emite WebM "de streaming": Segment y Clusters de tamaño
+// DESCONOCIDO, sin Duration y sin Cues → duración ∞ y seek roto (el video se
+// reinicia al saltar). Este remuxer copia Tracks y el contenido de los
+// Clusters INTACTOS (sin re-codificar) y reescribe el contenedor con
+// Duration + SeekHead + Cues.
+function _ebmlReadId(b, pos) {
+  const first = b[pos];
+  if (first === undefined) throw new Error('EBML truncado leyendo ID');
+  let len = 1, mask = 0x80;
+  while (len <= 4 && !(first & mask)) { mask >>= 1; len++; }
+  if (len > 4) throw new Error('ID EBML inválido');
+  let id = 0;
+  for (let i = 0; i < len; i++) id = id * 256 + b[pos + i];
+  return { id, len };
+}
+function _ebmlReadSize(b, pos) {
+  const first = b[pos];
+  if (first === undefined) throw new Error('EBML truncado leyendo tamaño');
+  let len = 1, mask = 0x80;
+  while (len <= 8 && !(first & mask)) { mask >>= 1; len++; }
+  if (len > 8) throw new Error('Tamaño EBML inválido');
+  let val = first & (mask - 1);
+  let ones = val === mask - 1;
+  for (let i = 1; i < len; i++) { val = val * 256 + b[pos + i]; if (b[pos + i] !== 0xFF) ones = false; }
+  return { size: ones ? null : val, len }; // null = tamaño desconocido
+}
+function _ebmlUint(b, start, end) { let v = 0; for (let i = start; i < end; i++) v = v * 256 + b[i]; return v; }
+const _EBML_LEVEL1 = new Set([0x1F43B675, 0x1549A966, 0x1654AE6B, 0x114D9B74, 0x1C53BB6B, 0x1254C367, 0x1043A770, 0x1941A469, 0x18538067, 0x1A45DFA3]);
+// Tiempos de los bloques de un cluster + si su PRIMER bloque de video es
+// keyframe (condición para poder apuntarle un CuePoint).
+function _scanClusterTimes(payload, videoTrack) {
+  let p = 0, tc = 0, tcSeen = false;
+  let firstVideoKey = null; // null = aún sin bloque de video visto
+  const times = [];
+  const readBlock = (q, isSimple, groupEnd) => {
+    const tv = _ebmlReadSize(payload, q); // el nº de pista se codifica como vint
+    const track = tv.size;
+    const hi = payload[q + tv.len], lo = payload[q + tv.len + 1];
+    times.push(tc + (((hi << 8) | lo) << 16 >> 16)); // rel int16 con signo
+    if (firstVideoKey === null && (!videoTrack || track === videoTrack)) {
+      if (isSimple) firstVideoKey = (payload[q + tv.len + 2] & 0x80) !== 0;
+      else {
+        // Block dentro de BlockGroup: es keyframe si el grupo NO tiene ReferenceBlock (0xFB)
+        let r = groupEnd.start, hasRef = false;
+        while (r < groupEnd.end) {
+          let rid, rsz;
+          try { rid = _ebmlReadId(payload, r); rsz = _ebmlReadSize(payload, r + rid.len); } catch { break; }
+          if (rid.id === 0xFB) { hasRef = true; break; }
+          r = r + rid.len + rsz.len + (rsz.size || 0);
+        }
+        firstVideoKey = !hasRef;
+      }
+    }
+  };
+  while (p < payload.length) {
+    let cid, csz;
+    try { cid = _ebmlReadId(payload, p); csz = _ebmlReadSize(payload, p + cid.len); } catch { break; }
+    const dataStart = p + cid.len + csz.len;
+    const clen = csz.size == null ? payload.length - dataStart : csz.size;
+    if (cid.id === 0xE7) { tc = _ebmlUint(payload, dataStart, dataStart + clen); tcSeen = true; }
+    else if (cid.id === 0xA3) readBlock(dataStart, true);
+    else if (cid.id === 0xA0) { // BlockGroup → buscar Block (0xA1)
+      let q = dataStart;
+      const qEnd = dataStart + clen;
+      while (q < qEnd) {
+        let gid, gsz;
+        try { gid = _ebmlReadId(payload, q); gsz = _ebmlReadSize(payload, q + gid.len); } catch { break; }
+        const gStart = q + gid.len + gsz.len;
+        if (gid.id === 0xA1) readBlock(gStart, false, { start: dataStart, end: qEnd });
+        q = gStart + (gsz.size == null ? qEnd - gStart : gsz.size);
+      }
+    }
+    p = dataStart + clen;
+  }
+  return { tc: tcSeen ? tc : 0, times, cueOk: firstVideoKey === true };
+}
+/**
+ * Remuxea un WebM (típicamente de MediaRecorder) a un WebM buscable.
+ * No toca los bytes de video/audio: solo reescribe el contenedor.
+ */
+function remuxWebM(buffer) {
+  const b = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  let pos = 0;
+  let e = _ebmlReadId(b, pos);
+  if (e.id !== 0x1A45DFA3) throw new Error('No es un archivo EBML/WebM');
+  pos += e.len;
+  let s = _ebmlReadSize(b, pos);
+  pos += s.len + (s.size == null ? 0 : s.size);
+  e = _ebmlReadId(b, pos);
+  if (e.id !== 0x18538067) throw new Error('Elemento Segment no encontrado');
+  pos += e.len;
+  s = _ebmlReadSize(b, pos);
+  pos += s.len;
+  const segEnd = s.size == null ? b.length : Math.min(b.length, pos + s.size);
+
+  let timecodeScale = 1000000, tracksBytes = null, videoTrackNum = 0, maxTick = 0, blockGap = 33;
+  const clusters = [];
+  while (pos < segEnd) {
+    let el, sz;
+    try { el = _ebmlReadId(b, pos); sz = _ebmlReadSize(b, pos + el.len); } catch { break; }
+    const dataStart = pos + el.len + sz.len;
+    if (el.id === 0x1549A966 && sz.size != null) { // Info → TimecodeScale (la Duration se regenera)
+      let p = dataStart;
+      const end = dataStart + sz.size;
+      while (p < end) {
+        const ci = _ebmlReadId(b, p); const cs = _ebmlReadSize(b, p + ci.len);
+        const ds = p + ci.len + cs.len;
+        if (ci.id === 0x2AD7B1 && cs.size) timecodeScale = _ebmlUint(b, ds, ds + cs.size);
+        p = ds + (cs.size || 0);
+      }
+      pos = end;
+    } else if (el.id === 0x1654AE6B && sz.size != null) { // Tracks → copiar íntegro + hallar pista de video
+      tracksBytes = b.slice(pos, dataStart + sz.size);
+      let p = dataStart;
+      const end = dataStart + sz.size;
+      while (p < end) {
+        const ti = _ebmlReadId(b, p); const tsz = _ebmlReadSize(b, p + ti.len);
+        const ds = p + ti.len + tsz.len;
+        if (ti.id === 0xAE && tsz.size) {
+          let q = ds, num = 0, type = 0;
+          const qEnd = ds + tsz.size;
+          while (q < qEnd) {
+            const fi = _ebmlReadId(b, q); const fs = _ebmlReadSize(b, q + fi.len);
+            const fds = q + fi.len + fs.len;
+            if (fi.id === 0xD7 && fs.size) num = _ebmlUint(b, fds, fds + fs.size);
+            if (fi.id === 0x83 && fs.size) type = _ebmlUint(b, fds, fds + fs.size);
+            q = fds + (fs.size || 0);
+          }
+          if (type === 1 && !videoTrackNum) videoTrackNum = num;
+        }
+        p = ds + (tsz.size || 0);
+      }
+      pos = end;
+    } else if (el.id === 0x1F43B675) { // Cluster (tamaño conocido O desconocido)
+      let payloadEnd;
+      if (sz.size != null) payloadEnd = Math.min(segEnd, dataStart + sz.size);
+      else {
+        // Tamaño desconocido (streaming): avanzar hijo a hijo hasta el próximo elemento de nivel 1
+        let p = dataStart;
+        while (p < segEnd) {
+          let ci;
+          try { ci = _ebmlReadId(b, p); } catch { break; }
+          if (_EBML_LEVEL1.has(ci.id)) break;
+          const cs = _ebmlReadSize(b, p + ci.len);
+          if (cs.size == null) break;
+          p += ci.len + cs.len + cs.size;
+        }
+        payloadEnd = p;
+      }
+      const payload = b.subarray(dataStart, payloadEnd);
+      const scan = _scanClusterTimes(payload, videoTrackNum || 0);
+      if (scan.times.length) {
+        const sorted = [...scan.times].sort((x, y) => x - y);
+        maxTick = Math.max(maxTick, sorted[sorted.length - 1]);
+        if (sorted.length > 1) blockGap = Math.max(1, sorted[sorted.length - 1] - sorted[sorted.length - 2]);
+      } else maxTick = Math.max(maxTick, scan.tc);
+      clusters.push({ tc: scan.tc, cue: scan.cueOk, bytes: _ebml(_WEBM_ID.Cluster, payload) }); // re-emitido CON tamaño definido
+      pos = payloadEnd;
+    } else {
+      // SeekHead/Cues/Tags/Void viejos: se descartan (se regeneran correctos)
+      if (sz.size == null) break;
+      pos = dataStart + sz.size;
+    }
+  }
+  if (!tracksBytes) throw new Error('WebM sin elemento Tracks');
+  if (!clusters.length) throw new Error('WebM sin clusters');
+  return _assembleWebM({
+    tracksBytes, clusters, videoTrackNum: videoTrackNum || 1,
+    durationTicks: maxTick + blockGap, timecodeScale,
+  });
+}
+
+// ---------- Muxer MP4 progresivo (ISO BMFF, JS puro) ----------
+// Escribe ftyp + moov (índice completo: stts/stss/stsc/stsz/stco) + mdat.
+// El moov va ANTES del mdat (faststart) y con tablas de samples correctas el
+// reproductor puede saltar a cualquier punto. Se usa para:
+//   1) codificación directa con WebCodecs H.264 (frames → MP4 rápido), y
+//   2) remuxear el MP4 FRAGMENTADO de MediaRecorder (moof/mdat, sin índice
+//      global → seek roto) a MP4 progresivo, copiando los samples tal cual.
+function _ru32(b, p) { return ((b[p] << 24) | (b[p + 1] << 16) | (b[p + 2] << 8) | b[p + 3]) >>> 0; }
+function _ru64(b, p) { return _ru32(b, p) * 4294967296 + _ru32(b, p + 4); }
+function _u16(n) { return new Uint8Array([(n >> 8) & 255, n & 255]); }
+function _u32(n) { return new Uint8Array([(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255]); }
+function _str4(s) { return new Uint8Array([s.charCodeAt(0), s.charCodeAt(1), s.charCodeAt(2), s.charCodeAt(3)]); }
+function _mbox(type, ...parts) {
+  const payload = _cat(parts.map(p => p instanceof Uint8Array ? p : new Uint8Array(p)));
+  const out = new Uint8Array(8 + payload.length);
+  out.set(_u32(out.length), 0);
+  out.set(_str4(type), 4);
+  out.set(payload, 8);
+  return out;
+}
+function _mfull(type, version, flags, ...parts) {
+  return _mbox(type, new Uint8Array([version, (flags >> 16) & 255, (flags >> 8) & 255, flags & 255]), ...parts);
+}
+// Recorre boxes MP4 en [start,end). Soporta size de 64 bits y size 0 (hasta el final).
+function* _mp4Boxes(b, start, end) {
+  let p = start;
+  while (p + 8 <= end) {
+    let size = _ru32(b, p);
+    const type = String.fromCharCode(b[p + 4], b[p + 5], b[p + 6], b[p + 7]);
+    let hdr = 8;
+    if (size === 1) { size = _ru64(b, p + 8); hdr = 16; }
+    else if (size === 0) size = end - p;
+    if (size < hdr || p + size > end) break;
+    yield { type, start: p, dataStart: p + hdr, end: p + size };
+    p += size;
+  }
+}
+/** Sample entry avc1 (VisualSampleEntry + avcC) para la vía WebCodecs H.264. */
+function avc1SampleEntry(W, H, avcC) {
+  return _mbox('avc1',
+    new Uint8Array(6), _u16(1),          // reserved + data_reference_index
+    new Uint8Array(16),                   // pre_defined/reserved
+    _u16(W), _u16(H),
+    _u32(0x00480000), _u32(0x00480000),   // 72 dpi
+    _u32(0), _u16(1),                     // reserved + frame_count
+    new Uint8Array(32),                   // compressorname (vacío)
+    _u16(0x0018), _u16(0xFFFF),           // depth + pre_defined(-1)
+    _mbox('avcC', avcC instanceof Uint8Array ? avcC : new Uint8Array(avcC)));
+}
+/**
+ * Construye un MP4 progresivo. tracks:
+ * [{ kind:'video'|'audio', timescale, W, H,
+ *    sampleEntry?: Uint8Array (box avc1/mp4a…) | stsdBox?: Uint8Array (box stsd completo copiado),
+ *    samples: [{ data: Uint8Array, dur: ticks, key: bool, cts?: ticks }] }]
+ */
+function buildMP4(tracks) {
+  const MOVIE_TS = 1000;
+  const ftyp = _mbox('ftyp', _str4('isom'), _u32(0x200), _str4('isom'), _str4('iso2'), _str4('avc1'), _str4('mp41'));
+  const built = tracks.map(t => {
+    const totalTs = t.samples.reduce((a, s) => a + s.dur, 0);
+    const durMs = Math.max(1, Math.round(totalTs * 1000 / t.timescale));
+    const stts = [];
+    for (const s of t.samples) {
+      const last = stts[stts.length - 1];
+      if (last && last[1] === s.dur) last[0]++;
+      else stts.push([1, s.dur]);
+    }
+    const keys = [];
+    t.samples.forEach((s, i) => { if (s.key) keys.push(i + 1); });
+    const allKey = keys.length === t.samples.length || keys.length === 0;
+    const ctts = [];
+    if (t.samples.some(s => s.cts)) {
+      for (const s of t.samples) {
+        const v = s.cts | 0;
+        const last = ctts[ctts.length - 1];
+        if (last && last[1] === v) last[0]++;
+        else ctts.push([1, v]);
+      }
+    }
+    return { t, totalTs, durMs, stts, keys, allKey, ctts };
+  });
+  const movieDurMs = Math.max(1, ...built.map(x => x.durMs));
+  const buildMoov = (chunkOffsets) => {
+    const traks = built.map((x, i) => {
+      const t = x.t;
+      const isV = t.kind === 'video';
+      const stsdBytes = t.stsdBox ? t.stsdBox : _mfull('stsd', 0, 0, _u32(1), t.sampleEntry);
+      const stbl = _mbox('stbl',
+        stsdBytes,
+        _mfull('stts', 0, 0, _u32(x.stts.length), _cat(x.stts.map(([c, d]) => _cat([_u32(c), _u32(d)])))),
+        ...(x.allKey ? [] : [_mfull('stss', 0, 0, _u32(x.keys.length), _cat(x.keys.map(k => _u32(k))))]),
+        ...(x.ctts.length ? [_mfull('ctts', 1, 0, _u32(x.ctts.length), _cat(x.ctts.map(([c, o]) => _cat([_u32(c), _u32(o >>> 0)]))))] : []),
+        _mfull('stsc', 0, 0, _u32(1), _u32(1), _u32(t.samples.length), _u32(1)),
+        _mfull('stsz', 0, 0, _u32(0), _u32(t.samples.length), _cat(t.samples.map(s => _u32(s.data.length)))),
+        _mfull('stco', 0, 0, _u32(1), _u32(chunkOffsets[i] || 0)));
+      const dinf = _mbox('dinf', _mfull('dref', 0, 0, _u32(1), _mfull('url ', 0, 1)));
+      const mhd = isV ? _mfull('vmhd', 0, 1, _u16(0), _u16(0), _u16(0), _u16(0)) : _mfull('smhd', 0, 0, _u16(0), _u16(0));
+      const hdlr = _mfull('hdlr', 0, 0, _u32(0), _str4(isV ? 'vide' : 'soun'), _u32(0), _u32(0), _u32(0), _str(isV ? 'VideoHandler\0' : 'SoundHandler\0'));
+      const mdhd = _mfull('mdhd', 0, 0, _u32(0), _u32(0), _u32(t.timescale), _u32(x.totalTs), _u16(0x55C4), _u16(0));
+      const mdia = _mbox('mdia', mdhd, hdlr, _mbox('minf', mhd, dinf, stbl));
+      const tkhd = _mfull('tkhd', 0, 3,
+        _u32(0), _u32(0), _u32(i + 1), _u32(0), _u32(x.durMs),
+        _u32(0), _u32(0), _u16(0), _u16(0), _u16(isV ? 0 : 0x0100), _u16(0),
+        _u32(0x10000), _u32(0), _u32(0), _u32(0), _u32(0x10000), _u32(0), _u32(0), _u32(0), _u32(0x40000000),
+        _u32(Math.round((t.W || 0) * 65536)), _u32(Math.round((t.H || 0) * 65536)));
+      return _mbox('trak', tkhd, mdia);
+    });
+    const mvhd = _mfull('mvhd', 0, 0,
+      _u32(0), _u32(0), _u32(MOVIE_TS), _u32(movieDurMs),
+      _u32(0x10000), _u16(0x0100), _u16(0), _u32(0), _u32(0),
+      _u32(0x10000), _u32(0), _u32(0), _u32(0), _u32(0x10000), _u32(0), _u32(0), _u32(0), _u32(0x40000000),
+      new Uint8Array(24), _u32(tracks.length + 1));
+    return _mbox('moov', mvhd, ...traks);
+  };
+  const probe = buildMoov(tracks.map(() => 0));
+  let off = ftyp.length + probe.length + 8; // + cabecera del mdat
+  const chunkOffsets = built.map(x => { const o = off; off += x.t.samples.reduce((a, s) => a + s.data.length, 0); return o; });
+  const moov = buildMoov(chunkOffsets);
+  if (moov.length !== probe.length) throw new Error('moov de tamaño inestable');
+  const mdat = _mbox('mdat', ...tracks.map(t => _cat(t.samples.map(s => s.data))));
+  return _cat([ftyp, moov, mdat]);
+}
+/**
+ * Remuxea un MP4 FRAGMENTADO (moof/mdat, típico de MediaRecorder) a MP4
+ * progresivo buscable. Copia los samples byte a byte (sin re-codificar) y
+ * conserva TODAS las pistas (video y audio). Devuelve null si el archivo ya
+ * es progresivo (no hay nada que arreglar).
+ */
+function remuxMP4(buffer) {
+  const b = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  const top = [..._mp4Boxes(b, 0, b.length)];
+  const moov = top.find(x => x.type === 'moov');
+  if (!moov) throw new Error('MP4 sin moov');
+  if (!top.some(x => x.type === 'moof')) return null; // ya es progresivo
+  const traks = [];
+  const trexByTrack = new Map();
+  for (const box of _mp4Boxes(b, moov.dataStart, moov.end)) {
+    if (box.type === 'trak') {
+      const t = { trackId: 0, timescale: 1000, kind: 'video', stsd: null, W: 0, H: 0 };
+      for (const c of _mp4Boxes(b, box.dataStart, box.end)) {
+        if (c.type === 'tkhd') {
+          const v = b[c.dataStart];
+          t.trackId = _ru32(b, c.dataStart + (v === 1 ? 20 : 12));
+          const wOff = c.end - 8;
+          t.W = _ru32(b, wOff) / 65536;
+          t.H = _ru32(b, wOff + 4) / 65536;
+        } else if (c.type === 'mdia') {
+          for (const m of _mp4Boxes(b, c.dataStart, c.end)) {
+            if (m.type === 'mdhd') { const v = b[m.dataStart]; t.timescale = _ru32(b, m.dataStart + (v === 1 ? 20 : 12)); }
+            else if (m.type === 'hdlr') {
+              const h = String.fromCharCode(b[m.dataStart + 8], b[m.dataStart + 9], b[m.dataStart + 10], b[m.dataStart + 11]);
+              t.kind = h === 'soun' ? 'audio' : 'video';
+            } else if (m.type === 'minf') {
+              for (const mi of _mp4Boxes(b, m.dataStart, m.end)) if (mi.type === 'stbl')
+                for (const st of _mp4Boxes(b, mi.dataStart, mi.end)) if (st.type === 'stsd') t.stsd = b.slice(st.start, st.end);
+            }
+          }
+        }
+      }
+      traks.push(t);
+    } else if (box.type === 'mvex') {
+      for (const c of _mp4Boxes(b, box.dataStart, box.end)) if (c.type === 'trex') {
+        trexByTrack.set(_ru32(b, c.dataStart + 4), {
+          dur: _ru32(b, c.dataStart + 12), size: _ru32(b, c.dataStart + 16), flags: _ru32(b, c.dataStart + 20),
+        });
+      }
+    }
+  }
+  const samplesByTrack = new Map(traks.map(t => [t.trackId, []]));
+  for (const moof of top) {
+    if (moof.type !== 'moof') continue;
+    for (const traf of _mp4Boxes(b, moof.dataStart, moof.end)) {
+      if (traf.type !== 'traf') continue;
+      let tid = 0, baseOff = moof.start, defDur = 0, defSize = 0, defFlags = 0;
+      const truns = [];
+      for (const c of _mp4Boxes(b, traf.dataStart, traf.end)) {
+        if (c.type === 'tfhd') {
+          const flags = _ru32(b, c.dataStart) & 0xFFFFFF;
+          tid = _ru32(b, c.dataStart + 4);
+          const trex = trexByTrack.get(tid) || { dur: 0, size: 0, flags: 0 };
+          defDur = trex.dur; defSize = trex.size; defFlags = trex.flags;
+          let p = c.dataStart + 8;
+          if (flags & 0x01) { baseOff = _ru64(b, p); p += 8; }
+          if (flags & 0x02) p += 4;
+          if (flags & 0x08) { defDur = _ru32(b, p); p += 4; }
+          if (flags & 0x10) { defSize = _ru32(b, p); p += 4; }
+          if (flags & 0x20) { defFlags = _ru32(b, p); p += 4; }
+          // sin base-data-offset y sin default-base-is-moof: el inicio del moof es la base de facto
+        } else if (c.type === 'trun') truns.push(c);
+      }
+      const arr = samplesByTrack.get(tid);
+      if (!arr) continue;
+      for (const c of truns) {
+        const ver = b[c.dataStart];
+        const fl = _ru32(b, c.dataStart) & 0xFFFFFF;
+        const n = _ru32(b, c.dataStart + 4);
+        let p = c.dataStart + 8;
+        let off = baseOff;
+        if (fl & 0x01) { off = baseOff + (_ru32(b, p) | 0); p += 4; }
+        let firstFlags = null;
+        if (fl & 0x04) { firstFlags = _ru32(b, p); p += 4; }
+        for (let i = 0; i < n; i++) {
+          let dur = defDur, size = defSize, flags = defFlags, cts = 0;
+          if (fl & 0x100) { dur = _ru32(b, p); p += 4; }
+          if (fl & 0x200) { size = _ru32(b, p); p += 4; }
+          if (fl & 0x400) { flags = _ru32(b, p); p += 4; }
+          if (fl & 0x800) { cts = ver === 0 ? _ru32(b, p) : (_ru32(b, p) | 0); p += 4; }
+          if (i === 0 && firstFlags != null) flags = firstFlags;
+          arr.push({ off, size, dur, cts, key: !(flags & 0x10000) });
+          off += size;
+        }
+      }
+    }
+  }
+  const outTracks = [];
+  for (const t of traks) {
+    const ss = samplesByTrack.get(t.trackId) || [];
+    if (!ss.length || !t.stsd) continue;
+    outTracks.push({
+      kind: t.kind, timescale: t.timescale, W: Math.round(t.W), H: Math.round(t.H), stsdBox: t.stsd,
+      samples: ss.map(s => ({ data: b.subarray(s.off, s.off + s.size), dur: Math.max(1, s.dur || 1), key: s.key, cts: s.cts })),
+    });
+  }
+  if (!outTracks.length) throw new Error('MP4 fragmentado sin muestras');
+  return buildMP4(outTracks);
+}
 
 // ---------- Cuantización de color (median cut) ----------
 /**
@@ -678,5 +1131,5 @@ function buildZip(entries, onProgress) {
 
 // Export para Node (tests); en navegador quedan como globals del script
 if (typeof module !== 'undefined') {
-  module.exports = { readFourCC, parseWebP, detectContainer, parseGIF, parsePNG, parseJPEG, parseBMP, buildAnimatedWebP, extractWebPFrameChunks, listZipEntries, extractZipEntry, buildWebM, quantize, lzwEncode, buildGifBuffer, encodeBMP, buildZip, crc32 };
+  module.exports = { readFourCC, parseWebP, detectContainer, parseGIF, parsePNG, parseJPEG, parseBMP, buildAnimatedWebP, extractWebPFrameChunks, listZipEntries, extractZipEntry, buildWebM, remuxWebM, buildMP4, remuxMP4, avc1SampleEntry, quantize, lzwEncode, buildGifBuffer, encodeBMP, buildZip, crc32 };
 }

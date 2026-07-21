@@ -7,242 +7,282 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
+/* ============ WEBP FORGE v1.5 — rediseño completo ============ */
 :root{
-  --bg:#080B14; --surface:#0F1729; --surface-2:#162040; --surface-3:#1D2A52;
-  --accent:#00D4FF; --accent-2:#7C3AED;
-  --ok:#10B981; --warn:#F59E0B; --err:#EF4444;
-  --text:#F0F4FF; --text-2:#8892AA;
-  --border:rgba(136,146,170,.18); --border-glow:rgba(0,212,255,.45);
-  --glow:0 0 20px rgba(0,212,255,.3);
-  --r:14px;
-  --font-ui:'Inter',system-ui,sans-serif; --font-display:'Space Grotesk','Inter',sans-serif; --font-mono:'JetBrains Mono',ui-monospace,monospace;
+  --bg:#0A0C10; --bg-2:#0D1016;
+  --surface:#12151C; --surface-2:#191D26; --surface-3:#222834;
+  --accent:#38BDF8; --accent-ink:#06202E; --accent-soft:rgba(56,189,248,.13);
+  --violet:#A78BFA;
+  --ok:#34D399; --ok-soft:rgba(52,211,153,.12);
+  --warn:#FBBF24; --warn-soft:rgba(251,191,36,.12);
+  --err:#F87171; --err-soft:rgba(248,113,113,.12);
+  --text:#E7ECF4; --text-2:#98A2B8; --text-3:#5C6578;
+  --border:#232936; --border-2:#2E3646;
+  --r:12px; --r-sm:9px;
+  --font-ui:'Inter',system-ui,sans-serif;
+  --font-display:'Space Grotesk','Inter',sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,monospace;
+  --shadow:0 8px 28px rgba(0,0,0,.45);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{color-scheme:dark}
+html{color-scheme:dark;scroll-behavior:smooth}
 body{
-  background:var(--bg);color:var(--text);font-family:var(--font-ui);font-size:14px;line-height:1.5;min-height:100vh;
-  background-image:radial-gradient(900px 500px at 15% -10%,rgba(124,58,237,.14),transparent 60%),radial-gradient(900px 500px at 85% -10%,rgba(0,212,255,.10),transparent 60%);
+  background:var(--bg);color:var(--text);font-family:var(--font-ui);font-size:14px;line-height:1.55;min-height:100vh;
+  background-image:radial-gradient(1100px 420px at 50% -180px,rgba(56,189,248,.07),transparent 70%);
   background-attachment:fixed;
 }
-::-webkit-scrollbar{width:9px;height:9px}
-::-webkit-scrollbar-track{background:var(--bg)}
-::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:8px;border:2px solid var(--bg)}
-::-webkit-scrollbar-thumb:hover{background:#2A3A6E}
-::selection{background:rgba(0,212,255,.3)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:8px}
+::-webkit-scrollbar-thumb:hover{background:var(--border-2)}
+::selection{background:rgba(56,189,248,.28)}
 button{font-family:inherit;cursor:pointer}
 input,select{font-family:inherit}
 
-/* ====== HEADER ====== */
+/* ============ HEADER ============ */
 header{
-  position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:18px;padding:14px 26px;
-  background:rgba(8,11,20,.75);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:16px;padding:12px 24px;
+  background:rgba(10,12,16,.82);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
 }
-.logo{display:flex;align-items:center;gap:11px}
+.logo{display:flex;align-items:center;gap:12px;flex-shrink:0}
 .logo-mark{
-  width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-size:19px;
-  background:linear-gradient(135deg,rgba(0,212,255,.2),rgba(124,58,237,.25));border:1px solid var(--border-glow);box-shadow:var(--glow);
+  width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:18px;
+  background:linear-gradient(160deg,var(--accent-soft),rgba(167,139,250,.16));
+  border:1px solid var(--border-2);
 }
-.logo h1{font-family:var(--font-display);font-size:21px;font-weight:700;letter-spacing:2.5px}
+.logo h1{font-family:var(--font-display);font-size:18px;font-weight:700;letter-spacing:2px;line-height:1.15}
 .logo h1 b{color:var(--accent);font-weight:700}
-.logo small{display:block;font-size:10px;color:var(--text-2);letter-spacing:1.5px;font-weight:400}
-#api-status{display:flex;gap:7px;flex-wrap:wrap;margin-left:6px}
+.logo small{display:block;font-size:9.5px;color:var(--text-2);letter-spacing:1.6px;font-weight:500}
+#api-status{display:flex;gap:6px;flex-wrap:wrap;margin-left:8px}
 .chip{
-  display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:99px;font-family:var(--font-mono);font-size:10.5px;
+  display:inline-flex;align-items:center;gap:4px;padding:2.5px 9px;border-radius:99px;
+  font-family:var(--font-mono);font-size:10px;letter-spacing:.2px;
   background:var(--surface);border:1px solid var(--border);color:var(--text-2);cursor:default;
 }
-.chip.on{color:var(--ok);border-color:rgba(16,185,129,.35)}
-.chip.off{color:var(--warn);border-color:rgba(245,158,11,.35)}
-#global-counter{margin-left:auto;font-family:var(--font-mono);font-size:12px;color:var(--text-2);white-space:nowrap}
+.chip.on{color:var(--ok);border-color:rgba(52,211,153,.28);background:rgba(52,211,153,.06)}
+.chip.off{color:var(--warn);border-color:rgba(251,191,36,.28);background:rgba(251,191,36,.05)}
+#global-counter{margin-left:auto;font-family:var(--font-mono);font-size:11.5px;color:var(--text-2);white-space:nowrap}
 #global-counter b{color:var(--accent);font-weight:500}
 
-/* ====== DROP ZONE ====== */
-main{max-width:1180px;margin:0 auto;padding:26px 22px 90px}
+/* ============ LAYOUT ============ */
+main{max-width:1340px;margin:0 auto;padding:24px 24px 110px}
+
+/* ============ DROP ZONE ============ */
 #dropzone{
-  position:relative;border:2px dashed rgba(0,212,255,.30);border-radius:20px;padding:54px 30px;text-align:center;
-  background:linear-gradient(180deg,rgba(15,23,41,.6),rgba(15,23,41,.25));transition:all .3s ease;cursor:pointer;overflow:hidden;
-  animation:pulse 3.2s ease-in-out infinite;
+  position:relative;border:1.5px dashed var(--border-2);border-radius:16px;padding:44px 30px;text-align:center;
+  background:linear-gradient(180deg,var(--surface) 0%,var(--bg-2) 100%);
+  transition:border-color .25s,background .25s,padding .3s;cursor:pointer;overflow:hidden;
 }
-@keyframes pulse{0%,100%{border-color:rgba(0,212,255,.30)}50%{border-color:rgba(0,212,255,.65)}}
+#dropzone:hover{border-color:var(--accent)}
+#dropzone::after{
+  content:'';position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .25s;
+  background:radial-gradient(600px 200px at 50% 0%,var(--accent-soft),transparent 70%);
+}
+#dropzone:hover::after{opacity:1}
 #dropzone.drag{
-  border-color:var(--accent);border-style:solid;background:rgba(0,212,255,.07);
-  box-shadow:0 0 50px rgba(0,212,255,.25),inset 0 0 80px rgba(0,212,255,.06);transform:scale(1.005);animation:none;
+  border-color:var(--accent);border-style:solid;background:var(--accent-soft);
+  box-shadow:inset 0 0 0 3px rgba(56,189,248,.22),0 0 44px rgba(56,189,248,.14);
 }
-#dropzone .dz-icon{font-size:42px;margin-bottom:10px;filter:drop-shadow(0 0 14px rgba(0,212,255,.5))}
-#dropzone h2{font-family:var(--font-display);font-size:22px;font-weight:500;margin-bottom:6px}
-#dropzone p{color:var(--text-2);font-size:13px;margin-bottom:18px}
-#dropzone .dz-buttons{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-#analyze-progress{display:none;margin-top:16px;font-family:var(--font-mono);font-size:12.5px;color:var(--accent)}
+#dropzone .dz-icon{font-size:36px;margin-bottom:8px}
+#dropzone h2{font-family:var(--font-display);font-size:20px;font-weight:600;margin-bottom:5px;letter-spacing:.2px}
+#dropzone p{color:var(--text-2);font-size:12.5px;margin-bottom:16px;max-width:640px;margin-inline:auto}
+#dropzone .dz-buttons{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;position:relative;z-index:1}
+#analyze-progress{display:none;margin-top:14px;font-family:var(--font-mono);font-size:12px;color:var(--accent)}
+/* Con archivos cargados la zona se compacta para ceder protagonismo a la lista */
+body.has-files #dropzone{padding:18px 24px}
+body.has-files #dropzone .dz-icon{display:none}
+body.has-files #dropzone h2{font-size:14.5px;margin-bottom:2px}
+body.has-files #dropzone p{font-size:11.5px;margin-bottom:10px}
 
-/* ====== BOTONES ====== */
+/* ============ BOTONES ============ */
 .btn{
-  display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:10px;border:1px solid var(--border);
-  background:var(--surface-2);color:var(--text);font-size:13px;font-weight:500;transition:all .3s ease;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:7px;padding:8.5px 16px;border-radius:var(--r-sm);
+  border:1px solid var(--border-2);background:var(--surface-2);color:var(--text);
+  font-size:13px;font-weight:500;transition:border-color .2s,background .2s,transform .12s,box-shadow .2s;white-space:nowrap;
 }
-.btn:hover{border-color:var(--border-glow);box-shadow:var(--glow);transform:translateY(-1px)}
-.btn:active{transform:translateY(0)}
-.btn:disabled{opacity:.40;pointer-events:none}
+.btn:hover{border-color:var(--accent);background:var(--surface-3)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.38;pointer-events:none}
 .btn-primary{
-  background:linear-gradient(135deg,#0099CC,#7C3AED);border:none;font-weight:600;font-size:14px;padding:11px 24px;
-  box-shadow:0 4px 18px rgba(0,212,255,.25);
+  background:var(--accent);border-color:var(--accent);color:var(--accent-ink);
+  font-weight:700;font-size:13.5px;padding:10px 22px;
+  box-shadow:0 3px 16px rgba(56,189,248,.28);
 }
-.btn-primary:hover{box-shadow:0 4px 28px rgba(0,212,255,.45)}
-.btn-sm{padding:5px 12px;font-size:12px;border-radius:8px}
-.btn-ok{border-color:rgba(16,185,129,.4);color:var(--ok)}
-.btn-danger{border-color:rgba(239,68,68,.4);color:var(--err)}
+.btn-primary:hover{background:#5CCBFB;border-color:#5CCBFB;box-shadow:0 4px 22px rgba(56,189,248,.4)}
+.btn-sm{padding:5.5px 11px;font-size:12px;border-radius:8px}
+.btn-ok{border-color:rgba(52,211,153,.4);color:var(--ok)}
+.btn-ok:hover{border-color:var(--ok);background:var(--ok-soft)}
+.btn-danger{border-color:rgba(248,113,113,.35);color:var(--err)}
+.btn-danger:hover{border-color:var(--err);background:var(--err-soft)}
 
-/* ====== CONTROLES GLOBALES ====== */
+/* ============ BARRA DE CONTROL ============ */
 #controls{
-  display:none;flex-wrap:wrap;gap:11px;align-items:center;margin-top:20px;padding:15px 17px;
-  background:rgba(15,23,41,.85);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:var(--r);
-  position:sticky;top:67px;z-index:40;
+  display:none;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px;padding:12px 14px;
+  background:rgba(18,21,28,.92);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:var(--r);
+  position:sticky;top:62px;z-index:40;box-shadow:var(--shadow);
 }
 #controls select{
-  background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:8px 11px;font-size:13px;outline:none;transition:border-color .3s;
+  background:var(--surface-2);color:var(--text);border:1px solid var(--border-2);border-radius:8px;
+  padding:7.5px 10px;font-size:12.5px;outline:none;transition:border-color .2s;
 }
-#controls select:focus{border-color:var(--border-glow)}
+#controls select:focus,#controls select:hover{border-color:var(--accent)}
 #search{
-  background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:13px;outline:none;width:170px;transition:all .3s;
+  background:var(--surface-2);color:var(--text);border:1px solid var(--border-2);border-radius:8px;
+  padding:7.5px 12px;font-size:12.5px;outline:none;width:190px;transition:border-color .2s,width .25s;
 }
-#search:focus{border-color:var(--border-glow);box-shadow:var(--glow)}
-#controls .opt{display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:var(--text-2);cursor:pointer;white-space:nowrap}
+#search:focus{border-color:var(--accent);width:230px}
+#controls .opt{
+  display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;color:var(--text-2);
+  cursor:pointer;white-space:nowrap;padding:6px 10px;border-radius:8px;border:1px solid transparent;
+}
+#controls .opt:hover{color:var(--text);border-color:var(--border-2);background:var(--surface-2)}
 #controls .opt input{accent-color:var(--accent);cursor:pointer}
-#controls .opt:hover{color:var(--text)}
 .spacer{flex:1}
-#filters{display:none;gap:7px;flex-wrap:wrap;margin-top:13px}
-.filter-chip{
-  padding:5px 14px;border-radius:99px;border:1px solid var(--border);background:transparent;color:var(--text-2);font-size:12px;transition:all .3s ease;
-}
-.filter-chip:hover{color:var(--text);border-color:var(--border-glow)}
-.filter-chip.active{background:rgba(0,212,255,.12);border-color:var(--accent);color:var(--accent)}
-.filter-chip .n{font-family:var(--font-mono);font-size:10.5px;opacity:.8}
 
-/* ====== TARJETAS ====== */
-#list{margin-top:18px;display:flex;flex-direction:column;gap:11px}
+/* ============ FILTROS ============ */
+#filters{display:none;gap:6px;flex-wrap:wrap;margin-top:12px}
+.filter-chip{
+  padding:6px 14px;border-radius:99px;border:1px solid var(--border);background:transparent;
+  color:var(--text-2);font-size:12px;font-weight:500;transition:all .2s;
+}
+.filter-chip:hover{color:var(--text);border-color:var(--border-2);background:var(--surface)}
+.filter-chip.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.filter-chip .n{font-family:var(--font-mono);font-size:10.5px;opacity:.85;margin-left:2px}
+
+/* ============ GRID DE TARJETAS ============ */
+#list{margin-top:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(470px,1fr));gap:12px;align-items:start}
 .card{
   position:relative;border-radius:var(--r);border:1px solid var(--border);
-  background:rgba(15,23,41,.72);backdrop-filter:blur(8px);transition:border-color .3s ease,box-shadow .3s ease,opacity .3s;
-  overflow:hidden;
+  background:var(--surface);transition:border-color .2s,box-shadow .2s;overflow:hidden;
 }
-.card:hover{border-color:rgba(0,212,255,.30)}
-.card.selected{border-color:rgba(0,212,255,.45);box-shadow:0 0 14px rgba(0,212,255,.12)}
-.card.processing{border-color:transparent}
-.card.processing::before{
-  content:'';position:absolute;inset:-150%;z-index:0;
-  background:conic-gradient(from 0deg,transparent 0 70%,var(--accent) 82%,var(--accent-2) 92%,transparent 100%);
-  animation:spin 2.2s linear infinite;
-}
-@keyframes spin{to{transform:rotate(360deg)}}
-.card.processing::after{content:'';position:absolute;inset:1.5px;border-radius:12.5px;background:#0E1527;z-index:0}
-.card-inner{position:relative;z-index:1;padding:14px 16px;display:flex;gap:14px;align-items:flex-start}
-.card.err-card{border-color:rgba(239,68,68,.4)}
-.card.done-card{border-color:rgba(16,185,129,.35)}
-.sel-box{margin-top:26px;accent-color:var(--accent);width:16px;height:16px;cursor:pointer;flex-shrink:0}
+.card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:transparent;transition:background .25s;z-index:2}
+.card:hover{border-color:var(--border-2);box-shadow:var(--shadow)}
+.card.selected{border-color:rgba(56,189,248,.5)}
+.card.selected::before{background:var(--accent)}
+.card.done-card::before{background:var(--ok)}
+.card.err-card{border-color:rgba(248,113,113,.42)}
+.card.err-card::before{background:var(--err)}
+.card.processing{border-color:rgba(56,189,248,.55)}
+.card.processing::before{background:var(--accent);animation:blink 1.1s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.card-inner{position:relative;z-index:1;padding:14px 15px 14px 18px;display:flex;gap:13px;align-items:flex-start}
+.sel-box{margin-top:38px;accent-color:var(--accent);width:15px;height:15px;cursor:pointer;flex-shrink:0}
 .thumb{
-  width:74px;height:74px;border-radius:10px;flex-shrink:0;object-fit:cover;border:1px solid var(--border);
-  background:repeating-conic-gradient(#141C33 0 25%,#0D1426 0 50%) 0 0/16px 16px;
+  width:92px;height:92px;border-radius:10px;flex-shrink:0;object-fit:cover;border:1px solid var(--border-2);
+  background:repeating-conic-gradient(#161B25 0 25%,#0E1219 0 50%) 0 0/14px 14px;
 }
-.thumb-skel{animation:shimmer 1.4s ease-in-out infinite}
-@keyframes shimmer{0%,100%{opacity:.45}50%{opacity:1}}
+.thumb-skel{animation:shimmer 1.3s ease-in-out infinite}
+@keyframes shimmer{0%,100%{opacity:.4}50%{opacity:1}}
 .card-body{flex:1;min-width:0}
-.card-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-.fname{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:46ch}
+.card-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-right:22px}
+.fname{font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:38ch}
 .badge{
-  padding:2.5px 9px;border-radius:6px;font-family:var(--font-mono);font-size:10px;font-weight:500;letter-spacing:.4px;white-space:nowrap;
+  padding:2.5px 8px;border-radius:6px;font-family:var(--font-mono);font-size:9.5px;font-weight:500;
+  letter-spacing:.4px;white-space:nowrap;
 }
-.badge.static{background:rgba(59,130,246,.16);color:#60A5FA;border:1px solid rgba(59,130,246,.35)}
-.badge.anim{background:rgba(124,58,237,.18);color:#A78BFA;border:1px solid rgba(124,58,237,.4)}
-.badge.video{background:rgba(245,158,11,.15);color:var(--warn);border:1px solid rgba(245,158,11,.35)}
-.badge.invalid{background:rgba(239,68,68,.15);color:var(--err);border:1px solid rgba(239,68,68,.4)}
-.fmeta{font-family:var(--font-mono);font-size:11px;color:var(--text-2);margin-top:3px}
+.badge.static{background:rgba(96,165,250,.13);color:#60A5FA;border:1px solid rgba(96,165,250,.3)}
+.badge.anim{background:rgba(167,139,250,.13);color:var(--violet);border:1px solid rgba(167,139,250,.32)}
+.badge.video{background:var(--warn-soft);color:var(--warn);border:1px solid rgba(251,191,36,.3)}
+.badge.invalid{background:var(--err-soft);color:var(--err);border:1px solid rgba(248,113,113,.35)}
+.fmeta{font-family:var(--font-mono);font-size:10.5px;color:var(--text-2);margin-top:4px;line-height:1.7}
 .fmeta b{color:var(--text);font-weight:500}
-.card-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+.card-controls{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:10px}
+.card-controls label{font-size:11.5px;color:var(--text-2)}
 .fmt-select{
-  background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 9px;font-size:12.5px;outline:none;font-family:var(--font-mono);
+  background:var(--surface-2);color:var(--text);border:1px solid var(--border-2);border-radius:8px;
+  padding:5.5px 8px;font-size:12px;outline:none;font-family:var(--font-mono);transition:border-color .2s;
 }
-.q-wrap{display:flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:11px;color:var(--text-2)}
-.q-wrap input[type=range]{width:110px;accent-color:var(--accent);cursor:pointer}
+.fmt-select:hover,.fmt-select:focus{border-color:var(--accent)}
+.q-wrap{display:flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:10.5px;color:var(--text-2)}
+.q-wrap input[type=range]{width:100px;accent-color:var(--accent);cursor:pointer}
 .progress-row{display:none;margin-top:10px;align-items:center;gap:10px}
-.pbar{flex:1;height:7px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.pbar{flex:1;height:5px;border-radius:99px;background:var(--surface-3);overflow:hidden}
 .pbar-fill{
-  height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent-2));
-  transition:width .25s ease;box-shadow:0 0 8px rgba(0,212,255,.5);
+  height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--violet));
+  transition:width .25s ease;
 }
-.ptext{font-family:var(--font-mono);font-size:11px;color:var(--accent);white-space:nowrap}
+.ptext{font-family:var(--font-mono);font-size:10.5px;color:var(--accent);white-space:nowrap;max-width:52%;overflow:hidden;text-overflow:ellipsis}
 .status-line{margin-top:8px;font-size:12px;display:none}
 .status-line.ok{color:var(--ok)}
 .status-line.error{color:var(--err)}
-.result-row{display:none;margin-top:10px;gap:8px;flex-wrap:wrap;align-items:center}
-.savings{font-family:var(--font-mono);font-size:11px;color:var(--text-2)}
+.result-row{display:none;margin-top:10px;gap:7px;flex-wrap:wrap;align-items:center}
+.savings{font-family:var(--font-mono);font-size:10.5px;color:var(--text-2)}
 .savings .pos{color:var(--ok)} .savings .neg{color:var(--warn)}
 details.stack{margin-top:6px;font-size:11px;color:var(--text-2)}
 details.stack pre{
-  font-family:var(--font-mono);font-size:10px;background:#0A0F1E;border:1px solid var(--border);border-radius:8px;
+  font-family:var(--font-mono);font-size:10px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;
   padding:8px;margin-top:5px;white-space:pre-wrap;max-height:120px;overflow:auto;
 }
 .card-x{
-  position:absolute;top:9px;right:11px;z-index:2;background:none;border:none;color:var(--text-2);font-size:15px;
-  padding:3px 7px;border-radius:7px;transition:all .3s;
+  position:absolute;top:8px;right:9px;z-index:3;background:none;border:none;color:var(--text-2);font-size:14px;
+  padding:3px 7px;border-radius:7px;transition:all .2s;line-height:1;
 }
-.card-x:hover{color:var(--err);background:rgba(239,68,68,.12)}
+.card-x:hover{color:var(--err);background:var(--err-soft)}
 
-/* ====== STATS PANEL ====== */
+/* ============ PANEL DE ESTADÍSTICAS ============ */
 #stats{
-  position:fixed;right:18px;bottom:18px;z-index:60;min-width:215px;padding:13px 16px;border-radius:13px;
-  background:rgba(15,23,41,.92);backdrop-filter:blur(12px);border:1px solid var(--border-glow);box-shadow:var(--glow);
+  position:fixed;right:18px;bottom:18px;z-index:60;min-width:220px;padding:13px 16px;border-radius:var(--r);
+  background:rgba(18,21,28,.95);backdrop-filter:blur(14px);border:1px solid var(--border-2);box-shadow:var(--shadow);
   font-family:var(--font-mono);font-size:11.5px;display:none;
 }
-#stats h4{font-family:var(--font-display);font-size:12px;letter-spacing:1.2px;color:var(--accent);margin-bottom:7px}
-#stats div{display:flex;justify-content:space-between;gap:14px;color:var(--text-2);padding:1.5px 0}
+#stats h4{font-family:var(--font-display);font-size:11.5px;letter-spacing:1.4px;color:var(--accent);margin-bottom:8px}
+#stats div{display:flex;justify-content:space-between;gap:14px;color:var(--text-2);padding:2px 0}
 #stats b{color:var(--text);font-weight:500}
 
-/* ====== MODAL ====== */
+/* ============ MODAL ============ */
 #modal{
-  position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:26px;
-  background:rgba(4,6,12,.82);backdrop-filter:blur(8px);
+  position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:24px;
+  background:rgba(5,7,10,.86);backdrop-filter:blur(10px);
 }
 #modal.open{display:flex}
 .modal-box{
-  background:var(--surface);border:1px solid var(--border-glow);border-radius:18px;box-shadow:0 0 60px rgba(0,212,255,.18);
-  max-width:1020px;width:100%;max-height:92vh;overflow:auto;padding:22px;
+  background:var(--surface);border:1px solid var(--border-2);border-radius:16px;box-shadow:var(--shadow);
+  max-width:1100px;width:100%;max-height:93vh;overflow:auto;padding:20px 22px;
 }
-.modal-head{display:flex;align-items:center;gap:12px;margin-bottom:16px}
-.modal-head h3{font-family:var(--font-display);font-size:17px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.compare{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+.modal-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.modal-head h3{font-family:var(--font-display);font-size:15.5px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media (max-width:760px){.compare{grid-template-columns:1fr}}
-.compare .pane{background:#0A0F1E;border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
-.pane h5{font-family:var(--font-mono);font-size:11px;color:var(--text-2);letter-spacing:1px;margin-bottom:9px}
+.compare .pane{background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
+.pane h5{font-family:var(--font-mono);font-size:10.5px;color:var(--text-2);letter-spacing:1.2px;margin-bottom:9px}
 .pane img,.pane video{
-  max-width:100%;max-height:54vh;border-radius:8px;
-  background:repeating-conic-gradient(#141C33 0 25%,#0D1426 0 50%) 0 0/18px 18px;
+  max-width:100%;max-height:56vh;border-radius:8px;
+  background:repeating-conic-gradient(#161B25 0 25%,#0E1219 0 50%) 0 0/16px 16px;
 }
-.pane .sz{font-family:var(--font-mono);font-size:11.5px;margin-top:9px;color:var(--text-2)}
+.pane .sz{font-family:var(--font-mono);font-size:11px;margin-top:9px;color:var(--text-2)}
 .pane .sz b{color:var(--accent)}
 
-/* ====== TOASTS ====== */
-#toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:120;display:flex;flex-direction:column;gap:9px;align-items:center}
+/* ============ TOASTS ============ */
+#toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:120;display:flex;flex-direction:column;gap:8px;align-items:center}
 .toast{
-  padding:10px 20px;border-radius:11px;background:var(--surface-2);border:1px solid var(--border-glow);
-  box-shadow:var(--glow);font-size:13px;animation:toastIn .3s ease;max-width:560px;
+  padding:10px 18px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border-2);
+  box-shadow:var(--shadow);font-size:12.5px;animation:toastIn .25s ease;max-width:560px;
 }
-.toast.warn{border-color:rgba(245,158,11,.5);box-shadow:0 0 18px rgba(245,158,11,.2)}
-.toast.err{border-color:rgba(239,68,68,.55);box-shadow:0 0 18px rgba(239,68,68,.22)}
-@keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.toast.warn{border-color:rgba(251,191,36,.45)}
+.toast.err{border-color:rgba(248,113,113,.5)}
+@keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 .fade-out{opacity:0;transition:opacity .4s}
 
-#empty-filter{display:none;text-align:center;color:var(--text-2);padding:34px;font-size:13px}
+#empty-filter{display:none;text-align:center;color:var(--text-2);padding:38px;font-size:13px}
 kbd{
-  font-family:var(--font-mono);font-size:10px;background:var(--surface-2);border:1px solid var(--border);
+  font-family:var(--font-mono);font-size:10px;background:var(--surface-2);border:1px solid var(--border-2);
   border-bottom-width:2px;border-radius:5px;padding:1px 6px;color:var(--text-2);
 }
-footer{margin-top:34px;text-align:center;color:var(--text-2);font-size:11.5px}
+footer{margin-top:36px;text-align:center;color:var(--text-2);font-size:11.5px}
 footer .keys{margin-top:6px}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width:1060px){#list{grid-template-columns:1fr}}
 @media (max-width:720px){
   header{padding:10px 14px;flex-wrap:wrap}
   #global-counter{width:100%;margin-left:0}
+  main{padding:16px 14px 110px}
   #controls{position:static}
   .fname{max-width:24ch}
+  #search{width:100%}
 }
 </style>
 </head>
@@ -266,7 +306,7 @@ footer .keys{margin-top:6px}
   <div id="dropzone" tabindex="0" role="button" aria-label="Zona para soltar imágenes, videos o ZIPs">
     <div class="dz-icon">📥</div>
     <h2>Arrastra tus imágenes, videos o ZIPs aquí</h2>
-    <p>WebP · GIF · PNG · JPG · BMP · WebM · MP4 · ZIP — sin límite de archivos · acepta carpetas completas · nada se sube a internet</p>
+    <p>WebP · GIF · PNG · JPG · BMP · WebM · MP4 · ZIP — sin límite de archivos · acepta carpetas completas · nada sale de tu equipo</p>
     <div class="dz-buttons">
       <button class="btn btn-primary" id="btn-pick">📂 Seleccionar archivos</button>
       <button class="btn" id="btn-pick-dir">🗂 Seleccionar carpeta</button>
@@ -706,32 +746,84 @@ function _uintBE(n) {
 }
 function _f64(f) { const b = new ArrayBuffer(8); new DataView(b).setFloat64(0, f, false); return new Uint8Array(b); }
 function _str(s) { const b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i); return b; }
-/**
- * Construye un WebM válido. codecId: 'V_VP8'|'V_VP9'.
- * blocks: [{ data: Uint8Array, key: bool, timestampMs }] ordenados.
- */
-function buildWebM(codecId, W, H, blocks, durationMs) {
-  const ID = {
-    EBML: [0x1A,0x45,0xDF,0xA3], EBMLVersion: [0x42,0x86], EBMLReadVersion: [0x42,0xF7],
-    EBMLMaxIDLength: [0x42,0xF2], EBMLMaxSizeLength: [0x42,0xF3], DocType: [0x42,0x82],
-    DocTypeVersion: [0x42,0x87], DocTypeReadVersion: [0x42,0x85],
-    Segment: [0x18,0x53,0x80,0x67], Info: [0x15,0x49,0xA9,0x66], TimecodeScale: [0x2A,0xD7,0xB1],
-    MuxingApp: [0x4D,0x80], WritingApp: [0x57,0x41], Duration: [0x44,0x89],
-    Tracks: [0x16,0x54,0xAE,0x6B], TrackEntry: [0xAE], TrackNumber: [0xD7], TrackUID: [0x73,0xC5],
-    TrackType: [0x83], CodecID: [0x86], Video: [0xE0], PixelWidth: [0xB0], PixelHeight: [0xBA],
-    Cluster: [0x1F,0x43,0xB6,0x75], Timecode: [0xE7], SimpleBlock: [0xA3],
-  };
-  const header = _ebml(ID.EBML, _cat([
+function _uintFixed(n, len) {
+  const b = new Uint8Array(len);
+  let v = n;
+  for (let i = len - 1; i >= 0; i--) { b[i] = v & 0xFF; v = Math.floor(v / 256); }
+  return b;
+}
+const _WEBM_ID = {
+  EBML: [0x1A,0x45,0xDF,0xA3], EBMLVersion: [0x42,0x86], EBMLReadVersion: [0x42,0xF7],
+  EBMLMaxIDLength: [0x42,0xF2], EBMLMaxSizeLength: [0x42,0xF3], DocType: [0x42,0x82],
+  DocTypeVersion: [0x42,0x87], DocTypeReadVersion: [0x42,0x85],
+  Segment: [0x18,0x53,0x80,0x67], SeekHead: [0x11,0x4D,0x9B,0x74], Seek: [0x4D,0xBB],
+  SeekID: [0x53,0xAB], SeekPosition: [0x53,0xAC],
+  Info: [0x15,0x49,0xA9,0x66], TimecodeScale: [0x2A,0xD7,0xB1],
+  MuxingApp: [0x4D,0x80], WritingApp: [0x57,0x41], Duration: [0x44,0x89],
+  Tracks: [0x16,0x54,0xAE,0x6B], TrackEntry: [0xAE], TrackNumber: [0xD7], TrackUID: [0x73,0xC5],
+  TrackType: [0x83], CodecID: [0x86], Video: [0xE0], PixelWidth: [0xB0], PixelHeight: [0xBA],
+  Cluster: [0x1F,0x43,0xB6,0x75], Timecode: [0xE7], SimpleBlock: [0xA3],
+  Cues: [0x1C,0x53,0xBB,0x6B], CuePoint: [0xBB], CueTime: [0xB3],
+  CueTrackPositions: [0xB7], CueTrack: [0xF7], CueClusterPosition: [0xF1],
+};
+function _webmEbmlHeader() {
+  const ID = _WEBM_ID;
+  return _ebml(ID.EBML, _cat([
     _ebml(ID.EBMLVersion, _uintBE(1)), _ebml(ID.EBMLReadVersion, _uintBE(1)),
     _ebml(ID.EBMLMaxIDLength, _uintBE(4)), _ebml(ID.EBMLMaxSizeLength, _uintBE(8)),
     _ebml(ID.DocType, _str('webm')), _ebml(ID.DocTypeVersion, _uintBE(2)), _ebml(ID.DocTypeReadVersion, _uintBE(2)),
   ]));
-  // TimecodeScale 1.000.000 ns = timestamps en milisegundos
+}
+/**
+ * Ensambla un Segment WebM COMPLETO y buscable: SeekHead (posiciones fijas de
+ * 8 bytes) + Info con Duration + Tracks + Clusters + Cues (índice de seek).
+ * Sin Cues, los reproductores no pueden saltar a un punto y "reinician" el
+ * video — este era el bug de seek de las versiones anteriores.
+ * clusters: [{ tc: timecode absoluto en ticks, bytes: Uint8Array del elemento Cluster completo }]
+ */
+function _assembleWebM(opts) {
+  const ID = _WEBM_ID;
+  const timecodeScale = opts.timecodeScale || 1000000;
   const info = _ebml(ID.Info, _cat([
-    _ebml(ID.TimecodeScale, _uintBE(1000000)),
-    _ebml(ID.Duration, _f64(Math.max(durationMs, 1))),
+    _ebml(ID.TimecodeScale, _uintBE(timecodeScale)),
+    _ebml(ID.Duration, _f64(Math.max(opts.durationTicks, 1))),
     _ebml(ID.MuxingApp, _str('webpforge')), _ebml(ID.WritingApp, _str('webpforge')),
   ]));
+  const mkSeek = (idBytes, pos) => _ebml(ID.Seek, _cat([
+    _ebml(ID.SeekID, new Uint8Array(idBytes)),
+    _ebml(ID.SeekPosition, _uintFixed(pos, 8)), // 8 bytes fijos → tamaño de SeekHead estable
+  ]));
+  const seekHeadSize = _ebml(ID.SeekHead, _cat([mkSeek(ID.Info, 0), mkSeek(ID.Tracks, 0), mkSeek(ID.Cues, 0)])).length;
+  const posInfo = seekHeadSize;
+  const posTracks = posInfo + info.length;
+  let off = posTracks + opts.tracksBytes.length;
+  const cuePts = [];
+  for (const c of opts.clusters) {
+    // Solo se indexan clusters que EMPIEZAN con keyframe de video: apuntar un
+    // CuePoint a un cluster sin keyframe rompe la decodificación tras el salto.
+    if (c.cue !== false) cuePts.push({ time: Math.max(0, Math.round(c.tc)), pos: off });
+    off += c.bytes.length;
+  }
+  if (!cuePts.length && opts.clusters.length) cuePts.push({ time: Math.max(0, Math.round(opts.clusters[0].tc)), pos: posTracks + opts.tracksBytes.length });
+  const posCues = off;
+  const cues = _ebml(ID.Cues, _cat(cuePts.map(p => _ebml(ID.CuePoint, _cat([
+    _ebml(ID.CueTime, _uintBE(p.time)),
+    _ebml(ID.CueTrackPositions, _cat([
+      _ebml(ID.CueTrack, _uintBE(opts.videoTrackNum || 1)),
+      _ebml(ID.CueClusterPosition, _uintFixed(p.pos, 8)),
+    ])),
+  ])))));
+  const seekHead = _ebml(ID.SeekHead, _cat([mkSeek(ID.Info, posInfo), mkSeek(ID.Tracks, posTracks), mkSeek(ID.Cues, posCues)]));
+  if (seekHead.length !== seekHeadSize) throw new Error('SeekHead de tamaño inesperado');
+  const segment = _ebml(ID.Segment, _cat([seekHead, info, opts.tracksBytes, ...opts.clusters.map(c => c.bytes), cues]));
+  return _cat([_webmEbmlHeader(), segment]);
+}
+/**
+ * Construye un WebM válido y BUSCABLE. codecId: 'V_VP8'|'V_VP9'.
+ * blocks: [{ data: Uint8Array, key: bool, timestampMs }] ordenados.
+ */
+function buildWebM(codecId, W, H, blocks, durationMs) {
+  const ID = _WEBM_ID;
   const tracks = _ebml(ID.Tracks, _ebml(ID.TrackEntry, _cat([
     _ebml(ID.TrackNumber, _uintBE(1)), _ebml(ID.TrackUID, _uintBE(1)), _ebml(ID.TrackType, _uintBE(1)),
     _ebml(ID.CodecID, _str(codecId)),
@@ -739,12 +831,14 @@ function buildWebM(codecId, W, H, blocks, durationMs) {
   ])));
   // Clusters: nuevo en cada keyframe o cada ~5s (timecode relativo es int16)
   const clusters = [];
-  let cur = null, curTc = 0;
+  let cur = null, curTc = 0, curKey = false;
+  const flush = () => { if (cur) clusters.push({ tc: curTc, cue: curKey, bytes: _ebml(ID.Cluster, _cat(cur)) }); };
   for (const b of blocks) {
     const ts = Math.round(b.timestampMs);
     if (!cur || (b.key && ts - curTc > 0) || ts - curTc > 5000) {
-      if (cur) clusters.push(_ebml(ID.Cluster, _cat(cur)));
+      flush();
       curTc = ts;
+      curKey = !!b.key; // el primer bloque decide si el cluster puede llevar CuePoint
       cur = [_ebml(ID.Timecode, _uintBE(ts))];
     }
     const rel = ts - curTc;
@@ -755,11 +849,410 @@ function buildWebM(codecId, W, H, blocks, durationMs) {
     sb.set(b.data, 4);
     cur.push(_ebml(ID.SimpleBlock, sb));
   }
-  if (cur) clusters.push(_ebml(ID.Cluster, _cat(cur)));
-  const segment = _ebml(ID.Segment, _cat([info, tracks, ..._toArr(clusters)]));
-  return _cat([header, segment]);
+  flush();
+  // TimecodeScale 1.000.000 ns → ticks = milisegundos
+  return _assembleWebM({ tracksBytes: tracks, clusters, videoTrackNum: 1, durationTicks: Math.max(durationMs, 1), timecodeScale: 1000000 });
 }
-function _toArr(a) { return a; }
+
+// ---------- Lector EBML + remuxer WebM (arregla salidas de MediaRecorder) ----------
+// MediaRecorder emite WebM "de streaming": Segment y Clusters de tamaño
+// DESCONOCIDO, sin Duration y sin Cues → duración ∞ y seek roto (el video se
+// reinicia al saltar). Este remuxer copia Tracks y el contenido de los
+// Clusters INTACTOS (sin re-codificar) y reescribe el contenedor con
+// Duration + SeekHead + Cues.
+function _ebmlReadId(b, pos) {
+  const first = b[pos];
+  if (first === undefined) throw new Error('EBML truncado leyendo ID');
+  let len = 1, mask = 0x80;
+  while (len <= 4 && !(first & mask)) { mask >>= 1; len++; }
+  if (len > 4) throw new Error('ID EBML inválido');
+  let id = 0;
+  for (let i = 0; i < len; i++) id = id * 256 + b[pos + i];
+  return { id, len };
+}
+function _ebmlReadSize(b, pos) {
+  const first = b[pos];
+  if (first === undefined) throw new Error('EBML truncado leyendo tamaño');
+  let len = 1, mask = 0x80;
+  while (len <= 8 && !(first & mask)) { mask >>= 1; len++; }
+  if (len > 8) throw new Error('Tamaño EBML inválido');
+  let val = first & (mask - 1);
+  let ones = val === mask - 1;
+  for (let i = 1; i < len; i++) { val = val * 256 + b[pos + i]; if (b[pos + i] !== 0xFF) ones = false; }
+  return { size: ones ? null : val, len }; // null = tamaño desconocido
+}
+function _ebmlUint(b, start, end) { let v = 0; for (let i = start; i < end; i++) v = v * 256 + b[i]; return v; }
+const _EBML_LEVEL1 = new Set([0x1F43B675, 0x1549A966, 0x1654AE6B, 0x114D9B74, 0x1C53BB6B, 0x1254C367, 0x1043A770, 0x1941A469, 0x18538067, 0x1A45DFA3]);
+// Tiempos de los bloques de un cluster + si su PRIMER bloque de video es
+// keyframe (condición para poder apuntarle un CuePoint).
+function _scanClusterTimes(payload, videoTrack) {
+  let p = 0, tc = 0, tcSeen = false;
+  let firstVideoKey = null; // null = aún sin bloque de video visto
+  const times = [];
+  const readBlock = (q, isSimple, groupEnd) => {
+    const tv = _ebmlReadSize(payload, q); // el nº de pista se codifica como vint
+    const track = tv.size;
+    const hi = payload[q + tv.len], lo = payload[q + tv.len + 1];
+    times.push(tc + (((hi << 8) | lo) << 16 >> 16)); // rel int16 con signo
+    if (firstVideoKey === null && (!videoTrack || track === videoTrack)) {
+      if (isSimple) firstVideoKey = (payload[q + tv.len + 2] & 0x80) !== 0;
+      else {
+        // Block dentro de BlockGroup: es keyframe si el grupo NO tiene ReferenceBlock (0xFB)
+        let r = groupEnd.start, hasRef = false;
+        while (r < groupEnd.end) {
+          let rid, rsz;
+          try { rid = _ebmlReadId(payload, r); rsz = _ebmlReadSize(payload, r + rid.len); } catch { break; }
+          if (rid.id === 0xFB) { hasRef = true; break; }
+          r = r + rid.len + rsz.len + (rsz.size || 0);
+        }
+        firstVideoKey = !hasRef;
+      }
+    }
+  };
+  while (p < payload.length) {
+    let cid, csz;
+    try { cid = _ebmlReadId(payload, p); csz = _ebmlReadSize(payload, p + cid.len); } catch { break; }
+    const dataStart = p + cid.len + csz.len;
+    const clen = csz.size == null ? payload.length - dataStart : csz.size;
+    if (cid.id === 0xE7) { tc = _ebmlUint(payload, dataStart, dataStart + clen); tcSeen = true; }
+    else if (cid.id === 0xA3) readBlock(dataStart, true);
+    else if (cid.id === 0xA0) { // BlockGroup → buscar Block (0xA1)
+      let q = dataStart;
+      const qEnd = dataStart + clen;
+      while (q < qEnd) {
+        let gid, gsz;
+        try { gid = _ebmlReadId(payload, q); gsz = _ebmlReadSize(payload, q + gid.len); } catch { break; }
+        const gStart = q + gid.len + gsz.len;
+        if (gid.id === 0xA1) readBlock(gStart, false, { start: dataStart, end: qEnd });
+        q = gStart + (gsz.size == null ? qEnd - gStart : gsz.size);
+      }
+    }
+    p = dataStart + clen;
+  }
+  return { tc: tcSeen ? tc : 0, times, cueOk: firstVideoKey === true };
+}
+/**
+ * Remuxea un WebM (típicamente de MediaRecorder) a un WebM buscable.
+ * No toca los bytes de video/audio: solo reescribe el contenedor.
+ */
+function remuxWebM(buffer) {
+  const b = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  let pos = 0;
+  let e = _ebmlReadId(b, pos);
+  if (e.id !== 0x1A45DFA3) throw new Error('No es un archivo EBML/WebM');
+  pos += e.len;
+  let s = _ebmlReadSize(b, pos);
+  pos += s.len + (s.size == null ? 0 : s.size);
+  e = _ebmlReadId(b, pos);
+  if (e.id !== 0x18538067) throw new Error('Elemento Segment no encontrado');
+  pos += e.len;
+  s = _ebmlReadSize(b, pos);
+  pos += s.len;
+  const segEnd = s.size == null ? b.length : Math.min(b.length, pos + s.size);
+
+  let timecodeScale = 1000000, tracksBytes = null, videoTrackNum = 0, maxTick = 0, blockGap = 33;
+  const clusters = [];
+  while (pos < segEnd) {
+    let el, sz;
+    try { el = _ebmlReadId(b, pos); sz = _ebmlReadSize(b, pos + el.len); } catch { break; }
+    const dataStart = pos + el.len + sz.len;
+    if (el.id === 0x1549A966 && sz.size != null) { // Info → TimecodeScale (la Duration se regenera)
+      let p = dataStart;
+      const end = dataStart + sz.size;
+      while (p < end) {
+        const ci = _ebmlReadId(b, p); const cs = _ebmlReadSize(b, p + ci.len);
+        const ds = p + ci.len + cs.len;
+        if (ci.id === 0x2AD7B1 && cs.size) timecodeScale = _ebmlUint(b, ds, ds + cs.size);
+        p = ds + (cs.size || 0);
+      }
+      pos = end;
+    } else if (el.id === 0x1654AE6B && sz.size != null) { // Tracks → copiar íntegro + hallar pista de video
+      tracksBytes = b.slice(pos, dataStart + sz.size);
+      let p = dataStart;
+      const end = dataStart + sz.size;
+      while (p < end) {
+        const ti = _ebmlReadId(b, p); const tsz = _ebmlReadSize(b, p + ti.len);
+        const ds = p + ti.len + tsz.len;
+        if (ti.id === 0xAE && tsz.size) {
+          let q = ds, num = 0, type = 0;
+          const qEnd = ds + tsz.size;
+          while (q < qEnd) {
+            const fi = _ebmlReadId(b, q); const fs = _ebmlReadSize(b, q + fi.len);
+            const fds = q + fi.len + fs.len;
+            if (fi.id === 0xD7 && fs.size) num = _ebmlUint(b, fds, fds + fs.size);
+            if (fi.id === 0x83 && fs.size) type = _ebmlUint(b, fds, fds + fs.size);
+            q = fds + (fs.size || 0);
+          }
+          if (type === 1 && !videoTrackNum) videoTrackNum = num;
+        }
+        p = ds + (tsz.size || 0);
+      }
+      pos = end;
+    } else if (el.id === 0x1F43B675) { // Cluster (tamaño conocido O desconocido)
+      let payloadEnd;
+      if (sz.size != null) payloadEnd = Math.min(segEnd, dataStart + sz.size);
+      else {
+        // Tamaño desconocido (streaming): avanzar hijo a hijo hasta el próximo elemento de nivel 1
+        let p = dataStart;
+        while (p < segEnd) {
+          let ci;
+          try { ci = _ebmlReadId(b, p); } catch { break; }
+          if (_EBML_LEVEL1.has(ci.id)) break;
+          const cs = _ebmlReadSize(b, p + ci.len);
+          if (cs.size == null) break;
+          p += ci.len + cs.len + cs.size;
+        }
+        payloadEnd = p;
+      }
+      const payload = b.subarray(dataStart, payloadEnd);
+      const scan = _scanClusterTimes(payload, videoTrackNum || 0);
+      if (scan.times.length) {
+        const sorted = [...scan.times].sort((x, y) => x - y);
+        maxTick = Math.max(maxTick, sorted[sorted.length - 1]);
+        if (sorted.length > 1) blockGap = Math.max(1, sorted[sorted.length - 1] - sorted[sorted.length - 2]);
+      } else maxTick = Math.max(maxTick, scan.tc);
+      clusters.push({ tc: scan.tc, cue: scan.cueOk, bytes: _ebml(_WEBM_ID.Cluster, payload) }); // re-emitido CON tamaño definido
+      pos = payloadEnd;
+    } else {
+      // SeekHead/Cues/Tags/Void viejos: se descartan (se regeneran correctos)
+      if (sz.size == null) break;
+      pos = dataStart + sz.size;
+    }
+  }
+  if (!tracksBytes) throw new Error('WebM sin elemento Tracks');
+  if (!clusters.length) throw new Error('WebM sin clusters');
+  return _assembleWebM({
+    tracksBytes, clusters, videoTrackNum: videoTrackNum || 1,
+    durationTicks: maxTick + blockGap, timecodeScale,
+  });
+}
+
+// ---------- Muxer MP4 progresivo (ISO BMFF, JS puro) ----------
+// Escribe ftyp + moov (índice completo: stts/stss/stsc/stsz/stco) + mdat.
+// El moov va ANTES del mdat (faststart) y con tablas de samples correctas el
+// reproductor puede saltar a cualquier punto. Se usa para:
+//   1) codificación directa con WebCodecs H.264 (frames → MP4 rápido), y
+//   2) remuxear el MP4 FRAGMENTADO de MediaRecorder (moof/mdat, sin índice
+//      global → seek roto) a MP4 progresivo, copiando los samples tal cual.
+function _ru32(b, p) { return ((b[p] << 24) | (b[p + 1] << 16) | (b[p + 2] << 8) | b[p + 3]) >>> 0; }
+function _ru64(b, p) { return _ru32(b, p) * 4294967296 + _ru32(b, p + 4); }
+function _u16(n) { return new Uint8Array([(n >> 8) & 255, n & 255]); }
+function _u32(n) { return new Uint8Array([(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255]); }
+function _str4(s) { return new Uint8Array([s.charCodeAt(0), s.charCodeAt(1), s.charCodeAt(2), s.charCodeAt(3)]); }
+function _mbox(type, ...parts) {
+  const payload = _cat(parts.map(p => p instanceof Uint8Array ? p : new Uint8Array(p)));
+  const out = new Uint8Array(8 + payload.length);
+  out.set(_u32(out.length), 0);
+  out.set(_str4(type), 4);
+  out.set(payload, 8);
+  return out;
+}
+function _mfull(type, version, flags, ...parts) {
+  return _mbox(type, new Uint8Array([version, (flags >> 16) & 255, (flags >> 8) & 255, flags & 255]), ...parts);
+}
+// Recorre boxes MP4 en [start,end). Soporta size de 64 bits y size 0 (hasta el final).
+function* _mp4Boxes(b, start, end) {
+  let p = start;
+  while (p + 8 <= end) {
+    let size = _ru32(b, p);
+    const type = String.fromCharCode(b[p + 4], b[p + 5], b[p + 6], b[p + 7]);
+    let hdr = 8;
+    if (size === 1) { size = _ru64(b, p + 8); hdr = 16; }
+    else if (size === 0) size = end - p;
+    if (size < hdr || p + size > end) break;
+    yield { type, start: p, dataStart: p + hdr, end: p + size };
+    p += size;
+  }
+}
+/** Sample entry avc1 (VisualSampleEntry + avcC) para la vía WebCodecs H.264. */
+function avc1SampleEntry(W, H, avcC) {
+  return _mbox('avc1',
+    new Uint8Array(6), _u16(1),          // reserved + data_reference_index
+    new Uint8Array(16),                   // pre_defined/reserved
+    _u16(W), _u16(H),
+    _u32(0x00480000), _u32(0x00480000),   // 72 dpi
+    _u32(0), _u16(1),                     // reserved + frame_count
+    new Uint8Array(32),                   // compressorname (vacío)
+    _u16(0x0018), _u16(0xFFFF),           // depth + pre_defined(-1)
+    _mbox('avcC', avcC instanceof Uint8Array ? avcC : new Uint8Array(avcC)));
+}
+/**
+ * Construye un MP4 progresivo. tracks:
+ * [{ kind:'video'|'audio', timescale, W, H,
+ *    sampleEntry?: Uint8Array (box avc1/mp4a…) | stsdBox?: Uint8Array (box stsd completo copiado),
+ *    samples: [{ data: Uint8Array, dur: ticks, key: bool, cts?: ticks }] }]
+ */
+function buildMP4(tracks) {
+  const MOVIE_TS = 1000;
+  const ftyp = _mbox('ftyp', _str4('isom'), _u32(0x200), _str4('isom'), _str4('iso2'), _str4('avc1'), _str4('mp41'));
+  const built = tracks.map(t => {
+    const totalTs = t.samples.reduce((a, s) => a + s.dur, 0);
+    const durMs = Math.max(1, Math.round(totalTs * 1000 / t.timescale));
+    const stts = [];
+    for (const s of t.samples) {
+      const last = stts[stts.length - 1];
+      if (last && last[1] === s.dur) last[0]++;
+      else stts.push([1, s.dur]);
+    }
+    const keys = [];
+    t.samples.forEach((s, i) => { if (s.key) keys.push(i + 1); });
+    const allKey = keys.length === t.samples.length || keys.length === 0;
+    const ctts = [];
+    if (t.samples.some(s => s.cts)) {
+      for (const s of t.samples) {
+        const v = s.cts | 0;
+        const last = ctts[ctts.length - 1];
+        if (last && last[1] === v) last[0]++;
+        else ctts.push([1, v]);
+      }
+    }
+    return { t, totalTs, durMs, stts, keys, allKey, ctts };
+  });
+  const movieDurMs = Math.max(1, ...built.map(x => x.durMs));
+  const buildMoov = (chunkOffsets) => {
+    const traks = built.map((x, i) => {
+      const t = x.t;
+      const isV = t.kind === 'video';
+      const stsdBytes = t.stsdBox ? t.stsdBox : _mfull('stsd', 0, 0, _u32(1), t.sampleEntry);
+      const stbl = _mbox('stbl',
+        stsdBytes,
+        _mfull('stts', 0, 0, _u32(x.stts.length), _cat(x.stts.map(([c, d]) => _cat([_u32(c), _u32(d)])))),
+        ...(x.allKey ? [] : [_mfull('stss', 0, 0, _u32(x.keys.length), _cat(x.keys.map(k => _u32(k))))]),
+        ...(x.ctts.length ? [_mfull('ctts', 1, 0, _u32(x.ctts.length), _cat(x.ctts.map(([c, o]) => _cat([_u32(c), _u32(o >>> 0)]))))] : []),
+        _mfull('stsc', 0, 0, _u32(1), _u32(1), _u32(t.samples.length), _u32(1)),
+        _mfull('stsz', 0, 0, _u32(0), _u32(t.samples.length), _cat(t.samples.map(s => _u32(s.data.length)))),
+        _mfull('stco', 0, 0, _u32(1), _u32(chunkOffsets[i] || 0)));
+      const dinf = _mbox('dinf', _mfull('dref', 0, 0, _u32(1), _mfull('url ', 0, 1)));
+      const mhd = isV ? _mfull('vmhd', 0, 1, _u16(0), _u16(0), _u16(0), _u16(0)) : _mfull('smhd', 0, 0, _u16(0), _u16(0));
+      const hdlr = _mfull('hdlr', 0, 0, _u32(0), _str4(isV ? 'vide' : 'soun'), _u32(0), _u32(0), _u32(0), _str(isV ? 'VideoHandler\0' : 'SoundHandler\0'));
+      const mdhd = _mfull('mdhd', 0, 0, _u32(0), _u32(0), _u32(t.timescale), _u32(x.totalTs), _u16(0x55C4), _u16(0));
+      const mdia = _mbox('mdia', mdhd, hdlr, _mbox('minf', mhd, dinf, stbl));
+      const tkhd = _mfull('tkhd', 0, 3,
+        _u32(0), _u32(0), _u32(i + 1), _u32(0), _u32(x.durMs),
+        _u32(0), _u32(0), _u16(0), _u16(0), _u16(isV ? 0 : 0x0100), _u16(0),
+        _u32(0x10000), _u32(0), _u32(0), _u32(0), _u32(0x10000), _u32(0), _u32(0), _u32(0), _u32(0x40000000),
+        _u32(Math.round((t.W || 0) * 65536)), _u32(Math.round((t.H || 0) * 65536)));
+      return _mbox('trak', tkhd, mdia);
+    });
+    const mvhd = _mfull('mvhd', 0, 0,
+      _u32(0), _u32(0), _u32(MOVIE_TS), _u32(movieDurMs),
+      _u32(0x10000), _u16(0x0100), _u16(0), _u32(0), _u32(0),
+      _u32(0x10000), _u32(0), _u32(0), _u32(0), _u32(0x10000), _u32(0), _u32(0), _u32(0), _u32(0x40000000),
+      new Uint8Array(24), _u32(tracks.length + 1));
+    return _mbox('moov', mvhd, ...traks);
+  };
+  const probe = buildMoov(tracks.map(() => 0));
+  let off = ftyp.length + probe.length + 8; // + cabecera del mdat
+  const chunkOffsets = built.map(x => { const o = off; off += x.t.samples.reduce((a, s) => a + s.data.length, 0); return o; });
+  const moov = buildMoov(chunkOffsets);
+  if (moov.length !== probe.length) throw new Error('moov de tamaño inestable');
+  const mdat = _mbox('mdat', ...tracks.map(t => _cat(t.samples.map(s => s.data))));
+  return _cat([ftyp, moov, mdat]);
+}
+/**
+ * Remuxea un MP4 FRAGMENTADO (moof/mdat, típico de MediaRecorder) a MP4
+ * progresivo buscable. Copia los samples byte a byte (sin re-codificar) y
+ * conserva TODAS las pistas (video y audio). Devuelve null si el archivo ya
+ * es progresivo (no hay nada que arreglar).
+ */
+function remuxMP4(buffer) {
+  const b = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  const top = [..._mp4Boxes(b, 0, b.length)];
+  const moov = top.find(x => x.type === 'moov');
+  if (!moov) throw new Error('MP4 sin moov');
+  if (!top.some(x => x.type === 'moof')) return null; // ya es progresivo
+  const traks = [];
+  const trexByTrack = new Map();
+  for (const box of _mp4Boxes(b, moov.dataStart, moov.end)) {
+    if (box.type === 'trak') {
+      const t = { trackId: 0, timescale: 1000, kind: 'video', stsd: null, W: 0, H: 0 };
+      for (const c of _mp4Boxes(b, box.dataStart, box.end)) {
+        if (c.type === 'tkhd') {
+          const v = b[c.dataStart];
+          t.trackId = _ru32(b, c.dataStart + (v === 1 ? 20 : 12));
+          const wOff = c.end - 8;
+          t.W = _ru32(b, wOff) / 65536;
+          t.H = _ru32(b, wOff + 4) / 65536;
+        } else if (c.type === 'mdia') {
+          for (const m of _mp4Boxes(b, c.dataStart, c.end)) {
+            if (m.type === 'mdhd') { const v = b[m.dataStart]; t.timescale = _ru32(b, m.dataStart + (v === 1 ? 20 : 12)); }
+            else if (m.type === 'hdlr') {
+              const h = String.fromCharCode(b[m.dataStart + 8], b[m.dataStart + 9], b[m.dataStart + 10], b[m.dataStart + 11]);
+              t.kind = h === 'soun' ? 'audio' : 'video';
+            } else if (m.type === 'minf') {
+              for (const mi of _mp4Boxes(b, m.dataStart, m.end)) if (mi.type === 'stbl')
+                for (const st of _mp4Boxes(b, mi.dataStart, mi.end)) if (st.type === 'stsd') t.stsd = b.slice(st.start, st.end);
+            }
+          }
+        }
+      }
+      traks.push(t);
+    } else if (box.type === 'mvex') {
+      for (const c of _mp4Boxes(b, box.dataStart, box.end)) if (c.type === 'trex') {
+        trexByTrack.set(_ru32(b, c.dataStart + 4), {
+          dur: _ru32(b, c.dataStart + 12), size: _ru32(b, c.dataStart + 16), flags: _ru32(b, c.dataStart + 20),
+        });
+      }
+    }
+  }
+  const samplesByTrack = new Map(traks.map(t => [t.trackId, []]));
+  for (const moof of top) {
+    if (moof.type !== 'moof') continue;
+    for (const traf of _mp4Boxes(b, moof.dataStart, moof.end)) {
+      if (traf.type !== 'traf') continue;
+      let tid = 0, baseOff = moof.start, defDur = 0, defSize = 0, defFlags = 0;
+      const truns = [];
+      for (const c of _mp4Boxes(b, traf.dataStart, traf.end)) {
+        if (c.type === 'tfhd') {
+          const flags = _ru32(b, c.dataStart) & 0xFFFFFF;
+          tid = _ru32(b, c.dataStart + 4);
+          const trex = trexByTrack.get(tid) || { dur: 0, size: 0, flags: 0 };
+          defDur = trex.dur; defSize = trex.size; defFlags = trex.flags;
+          let p = c.dataStart + 8;
+          if (flags & 0x01) { baseOff = _ru64(b, p); p += 8; }
+          if (flags & 0x02) p += 4;
+          if (flags & 0x08) { defDur = _ru32(b, p); p += 4; }
+          if (flags & 0x10) { defSize = _ru32(b, p); p += 4; }
+          if (flags & 0x20) { defFlags = _ru32(b, p); p += 4; }
+          // sin base-data-offset y sin default-base-is-moof: el inicio del moof es la base de facto
+        } else if (c.type === 'trun') truns.push(c);
+      }
+      const arr = samplesByTrack.get(tid);
+      if (!arr) continue;
+      for (const c of truns) {
+        const ver = b[c.dataStart];
+        const fl = _ru32(b, c.dataStart) & 0xFFFFFF;
+        const n = _ru32(b, c.dataStart + 4);
+        let p = c.dataStart + 8;
+        let off = baseOff;
+        if (fl & 0x01) { off = baseOff + (_ru32(b, p) | 0); p += 4; }
+        let firstFlags = null;
+        if (fl & 0x04) { firstFlags = _ru32(b, p); p += 4; }
+        for (let i = 0; i < n; i++) {
+          let dur = defDur, size = defSize, flags = defFlags, cts = 0;
+          if (fl & 0x100) { dur = _ru32(b, p); p += 4; }
+          if (fl & 0x200) { size = _ru32(b, p); p += 4; }
+          if (fl & 0x400) { flags = _ru32(b, p); p += 4; }
+          if (fl & 0x800) { cts = ver === 0 ? _ru32(b, p) : (_ru32(b, p) | 0); p += 4; }
+          if (i === 0 && firstFlags != null) flags = firstFlags;
+          arr.push({ off, size, dur, cts, key: !(flags & 0x10000) });
+          off += size;
+        }
+      }
+    }
+  }
+  const outTracks = [];
+  for (const t of traks) {
+    const ss = samplesByTrack.get(t.trackId) || [];
+    if (!ss.length || !t.stsd) continue;
+    outTracks.push({
+      kind: t.kind, timescale: t.timescale, W: Math.round(t.W), H: Math.round(t.H), stsdBox: t.stsd,
+      samples: ss.map(s => ({ data: b.subarray(s.off, s.off + s.size), dur: Math.max(1, s.dur || 1), key: s.key, cts: s.cts })),
+    });
+  }
+  if (!outTracks.length) throw new Error('MP4 fragmentado sin muestras');
+  return buildMP4(outTracks);
+}
 
 // ---------- Cuantización de color (median cut) ----------
 /**
@@ -1032,8 +1525,11 @@ function buildZip(entries, onProgress) {
 
 
 /* ============================================================
-   WEBP FORGE — APP v1.1 (UI, pipeline de conversión, cola, ZIP)
-   Entradas: WebP (estático/animado), WebM, MP4
+   WEBP FORGE — APP v1.5 (UI, pipeline de conversión, cola, ZIP)
+   Entradas: WebP, GIF, PNG, JPG, BMP, WebM, MP4, ZIP
+   v1.5: videos BUSCABLES (Cues/moov + remux post-MediaRecorder),
+   MP4 acelerado con WebCodecs H.264 + muxer ISO BMFF propio,
+   rediseño completo de la interfaz.
    ============================================================ */
 
 // ---------- Capacidades del navegador ----------
@@ -1084,7 +1580,14 @@ const stats = { startedAt: 0, batchDone: 0, batchTotal: 0, times: [] };
 const $ = (s, el) => (el || document).querySelector(s);
 const $$ = (s, el) => [...(el || document).querySelectorAll(s)];
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-const raf = () => new Promise(r => requestAnimationFrame(r));
+// requestAnimationFrame NO dispara con la pestaña en segundo plano: sin el
+// fallback por timer, las conversiones se CONGELABAN al minimizar la ventana.
+const raf = () => new Promise(r => {
+  let done = false;
+  const go = () => { if (!done) { done = true; r(); } };
+  requestAnimationFrame(go);
+  setTimeout(go, 60);
+});
 function humanSize(b) {
   if (b == null) return '—';
   if (b < 1024) return b + ' B';
@@ -1211,14 +1714,16 @@ async function walkEntry(entry, out) {
   }
 }
 
-// Lee metadatos de un video con un elemento <video> (con timeout de seguridad)
+// Lee metadatos de un video con un elemento <video> (con timeout de seguridad).
+// preload='auto' + play() silencioso: en pestañas en segundo plano Chrome
+// APLAZA la carga de <video> y loadedmetadata no llegaba nunca (timeout).
 function probeVideo(file) {
   return new Promise((res, rej) => {
     const url = URL.createObjectURL(file);
     const v = document.createElement('video');
     const timer = setTimeout(() => { cleanup(); rej(new Error('timeout leyendo metadatos')); }, 15000);
-    const cleanup = () => { clearTimeout(timer); URL.revokeObjectURL(url); v.removeAttribute('src'); v.load(); };
-    v.preload = 'metadata'; v.muted = true;
+    const cleanup = () => { clearTimeout(timer); try { v.pause(); } catch {} URL.revokeObjectURL(url); v.removeAttribute('src'); v.load(); };
+    v.preload = 'auto'; v.muted = true; v.playsInline = true;
     v.onloadedmetadata = () => {
       const out = { width: v.videoWidth, height: v.videoHeight, durationMs: Math.round((v.duration || 0) * 1000) };
       cleanup();
@@ -1227,6 +1732,9 @@ function probeVideo(file) {
     };
     v.onerror = () => { cleanup(); rej(new Error('códec no soportado por este navegador')); };
     v.src = url;
+    v.load();
+    const p = v.play();
+    if (p && p.catch) p.catch(() => {}); // solo fuerza la carga; el autoplay puede fallar sin problema
   });
 }
 
@@ -1454,11 +1962,12 @@ const thumbObserver = new IntersectionObserver(async (obs) => {
     if (!entry) continue;
     try {
       let w, h, draw;
+      const TH = 184; // 92px CSS × 2 para nitidez en pantallas retina
       if (entry.kind === 'video' && entry.info && entry.info.valid) {
         const { v, url } = await videoElement(entry);
         await seekTo(v, Math.min(0.1, (v.duration || 1) / 10));
         w = v.videoWidth; h = v.videoHeight; draw = v;
-        const s = 74 / Math.max(w, h);
+        const s = TH / Math.max(w, h);
         const c = document.createElement('canvas');
         c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(h * s));
         c.getContext('2d').drawImage(draw, 0, 0, c.width, c.height);
@@ -1466,7 +1975,7 @@ const thumbObserver = new IntersectionObserver(async (obs) => {
         URL.revokeObjectURL(url);
       } else {
         const bmp = await createImageBitmap(entry.file); // primer frame del webp
-        const s = 74 / Math.max(bmp.width, bmp.height);
+        const s = TH / Math.max(bmp.width, bmp.height);
         const c = document.createElement('canvas');
         c.width = Math.max(1, Math.round(bmp.width * s));
         c.height = Math.max(1, Math.round(bmp.height * s));
@@ -1687,7 +2196,9 @@ async function videoToVideo(entry, wantMp4, onProg) {
       }
       throw new Error('MediaRecorder no produjo datos — códec posiblemente no soportado');
     }
-    return { blob: new Blob(chunks, { type: mime.split(';')[0] }), ext, fellBack: wantMp4 && !useMp4 };
+    onProg(`Reparando índice de seek…`, 97);
+    const blob = await fixSeekableBlob(new Blob(chunks, { type: mime.split(';')[0] }), ext);
+    return { blob, ext, fellBack: wantMp4 && !useMp4 };
   } finally { URL.revokeObjectURL(url); }
 }
 
@@ -1721,6 +2232,23 @@ function encodeGifInWorker(frames, w, h, loop, onProg) {
     wk.onerror = (e) => { rej(new Error(e.message || 'Error en worker GIF')); wk.terminate(); };
     wk.postMessage({ frames, width: w, height: h, loop }, frames.map(f => f.data));
   });
+}
+
+// ---------- Post-proceso: hacer BUSCABLE lo que graba MediaRecorder ----------
+// MediaRecorder emite video "de streaming": sin duración (∞) y sin índice de
+// seek → al hacer clic en la barra el video se reiniciaba. Se remuxea el
+// contenedor (sin re-codificar) con Duration + Cues (WebM) o moov progresivo
+// (MP4). Si el remux fallara, se entrega el original (nunca peor).
+async function fixSeekableBlob(blob, ext) {
+  try {
+    const buf = new Uint8Array(await blob.arrayBuffer());
+    if (ext === 'webm') return new Blob([remuxWebM(buf)], { type: 'video/webm' });
+    if (ext === 'mp4') {
+      const out = remuxMP4(buf);
+      return out ? new Blob([out], { type: 'video/mp4' }) : blob;
+    }
+  } catch (e) { console.warn('Remux post-grabación falló; se entrega el original:', e); }
+  return blob;
 }
 
 // ---------- Video desde frames (WebP animado → MP4/WebM, tiempo real) ----------
@@ -1777,7 +2305,9 @@ async function framesToVideo(frames, w, h, wantMp4, onProg) {
     }
     throw new Error('MediaRecorder no produjo datos — códec posiblemente no soportado');
   }
-  return { blob: new Blob(chunks, { type: mime.split(';')[0] }), ext, fellBack: wantMp4 && !useMp4 };
+  onProg && onProg('Reparando índice de seek…', 97);
+  const blob = await fixSeekableBlob(new Blob(chunks, { type: mime.split(';')[0] }), ext);
+  return { blob, ext, fellBack: wantMp4 && !useMp4 };
 }
 
 // ---------- WebP animado desde frames (canvas → webp estático → muxer propio) ----------
@@ -1847,13 +2377,78 @@ async function framesToWebMFast(frames, w, h, onProg) {
   if (!blocks.length) throw new Error('VideoEncoder no produjo chunks');
   return new Blob([buildWebM(codecId, W, H, blocks, ts)], { type: 'video/webm' });
 }
-// Comprueba que un blob de video es decodificable antes de darlo por bueno
+
+// ---------- MP4 acelerado: WebCodecs H.264 + muxer ISO BMFF propio ----------
+// MP4 real, con moov progresivo y seek perfecto, codificado más rápido que
+// tiempo real (encoder por hardware si el sistema lo expone). En Electron el
+// H.264 no está disponible → isConfigSupported dirá que no y se cae al
+// camino clásico (que a su vez degrada a WebM con aviso).
+async function framesToMP4Fast(frames, w, h, onProg) {
+  const W = Math.max(2, w & ~1), H = Math.max(2, h & ~1);
+  let codec = null, hwConfig = null;
+  for (const c of ['avc1.640033', 'avc1.4D0033', 'avc1.42E01E', 'avc1.42001E']) { // High/Main L5.1 → Baseline
+    try {
+      const hw = await VideoEncoder.isConfigSupported({ codec: c, width: W, height: H, avc: { format: 'avc' }, hardwareAcceleration: 'prefer-hardware' });
+      if (hw.supported) { codec = c; hwConfig = 'prefer-hardware'; break; }
+    } catch {}
+    try {
+      const sup = await VideoEncoder.isConfigSupported({ codec: c, width: W, height: H, avc: { format: 'avc' } });
+      if (sup.supported) { codec = c; hwConfig = null; break; }
+    } catch {}
+  }
+  if (!codec) throw new Error('VideoEncoder sin soporte H.264 en este entorno');
+  let description = null, encError = null;
+  const samples = [];
+  const enc = new VideoEncoder({
+    output: (chunk, meta) => {
+      if (!description && meta && meta.decoderConfig && meta.decoderConfig.description) {
+        description = new Uint8Array(meta.decoderConfig.description instanceof ArrayBuffer ? meta.decoderConfig.description : meta.decoderConfig.description.buffer);
+      }
+      const d = new Uint8Array(chunk.byteLength);
+      chunk.copyTo(d);
+      samples.push({ data: d, key: chunk.type === 'key', durUs: chunk.duration || 0 });
+    },
+    error: (e) => { encError = e; }
+  });
+  const cfg = { codec, width: W, height: H, bitrate: 16_000_000, avc: { format: 'avc' } };
+  if (hwConfig) cfg.hardwareAcceleration = hwConfig;
+  enc.configure(cfg);
+  const c = makeCanvas(W, H);
+  const ctx = c.getContext('2d');
+  const delayOf = (i) => frames.length === 1 ? 3000 : Math.max(frames[i].delayMs, 10);
+  let ts = 0;
+  for (let i = 0; i < frames.length; i++) {
+    ctx.drawImage(frames[i].bmp, 0, 0, W, H);
+    const vf = new VideoFrame(c, { timestamp: ts * 1000, duration: delayOf(i) * 1000 });
+    enc.encode(vf, { keyFrame: i % 60 === 0 });
+    vf.close();
+    ts += delayOf(i);
+    onProg && onProg(`Codificando ⚡H.264 ${i + 1}/${frames.length}`, 40 + (i + 1) / frames.length * 50);
+    if (i % 10 === 9) await raf();
+  }
+  await enc.flush();
+  enc.close();
+  if (encError) throw encError;
+  if (!samples.length) throw new Error('VideoEncoder no produjo muestras');
+  if (!description) throw new Error('El encoder no entregó avcC (description)');
+  const TS = 90000; // timescale estándar de video
+  let i = 0;
+  const mp4 = buildMP4([{
+    kind: 'video', timescale: TS, W, H,
+    sampleEntry: avc1SampleEntry(W, H, description),
+    samples: samples.map(s => ({ data: s.data, key: s.key, dur: Math.max(1, Math.round(delayOf(i++) * TS / 1000)) })),
+  }]);
+  return new Blob([mp4], { type: 'video/mp4' });
+}
+
+// Comprueba que un blob de video es decodificable Y buscable antes de darlo
+// por bueno (dimensiones válidas + duración finita, sin la cual no hay seek)
 function validateVideoBlob(blob) {
   return new Promise((res) => {
     const url = URL.createObjectURL(blob);
     const v = document.createElement('video');
     const t = setTimeout(() => { URL.revokeObjectURL(url); res(false); }, 8000);
-    v.onloadedmetadata = () => { clearTimeout(t); URL.revokeObjectURL(url); res(v.videoWidth > 0); };
+    v.onloadedmetadata = () => { clearTimeout(t); URL.revokeObjectURL(url); res(v.videoWidth > 0 && isFinite(v.duration) && v.duration > 0); };
     v.onerror = () => { clearTimeout(t); URL.revokeObjectURL(url); res(false); };
     v.src = url;
   });
@@ -1971,14 +2566,17 @@ async function convertEntry(entry) {
           (p) => setProgress(entry, `Codificando frame ${Math.round(p * frames.length)}/${frames.length} (LZW)`, 52 + p * 45));
       } else if (fmt === 'mp4' || fmt === 'webm') {
         let r = null;
-        // ⚡ Vía rápida: WebCodecs (encoder por hardware si existe) + muxer WebM propio.
+        // ⚡ Vía rápida: WebCodecs (encoder por hardware si existe) + muxer propio
+        // (WebM con Cues o MP4 progresivo — ambos con seek correcto).
         // El resultado se VALIDA decodificándolo; si algo falla → MediaRecorder clásico.
-        if (fmt === 'webm' && SETTINGS.gpu && CAP.webcodecs && typeof VideoFrame !== 'undefined' && frames.length > 1) {
+        if (SETTINGS.gpu && CAP.webcodecs && typeof VideoFrame !== 'undefined') {
           try {
-            const fast = await framesToWebMFast(frames, W, H, (t, p) => setProgress(entry, t, p));
-            setProgress(entry, 'Validando WebM generado…', 95);
+            const fast = fmt === 'webm'
+              ? await framesToWebMFast(frames, W, H, (t, p) => setProgress(entry, t, p))
+              : await framesToMP4Fast(frames, W, H, (t, p) => setProgress(entry, t, p));
+            setProgress(entry, `Validando ${fmt.toUpperCase()} generado…`, 95);
             if (await validateVideoBlob(fast)) {
-              r = { blob: fast, ext: 'webm', fellBack: false };
+              r = { blob: fast, ext: fmt, fellBack: false };
               entry.fallbackNote = 'codificado con WebCodecs (acelerado, más rápido que tiempo real)';
             }
           } catch (e) { console.warn('Vía WebCodecs falló; fallback a MediaRecorder:', e); }
@@ -2173,6 +2771,7 @@ $('#search').addEventListener('input', (e) => { searchTerm = e.target.value.toLo
 
 function refreshCounters() {
   const all = [...FILES.values()];
+  document.body.classList.toggle('has-files', all.length > 0); // compacta la dropzone
   const done = all.filter(e => e.status === 'done').length;
   const proc = all.filter(e => e.status === 'processing').length;
   $('#global-counter').innerHTML = `<b>${all.length}</b> archivos &nbsp;|&nbsp; <b>${done}</b> completados &nbsp;|&nbsp; <b>${proc}</b> procesando`;
@@ -2311,7 +2910,7 @@ window.addEventListener('beforeunload', () => {
 });
 
 // Hook de depuración/integración (consola): window.WEBPFORGE
-window.WEBPFORGE = { version: '1.4.1', SETTINGS, FILES, CAP, addFiles, parseWebP, detectContainer };
+window.WEBPFORGE = { version: '1.5.0', SETTINGS, FILES, CAP, addFiles, parseWebP, detectContainer };
 
 </script>
 
@@ -2415,9 +3014,32 @@ NOVEDADES v1.2 — CONVERTIDOR UNIVERSAL + ACELERACIÓN
 - Decodificación: ImageDecoder ahora también para image/gif (frame a frame
   con delays reales); imágenes estáticas por createImageBitmap (GPU).
 
+NOVEDADES v1.5 — SEEK CORRECTO EN VIDEO + MP4 REAL + REDISEÑO
+- BUG RESUELTO (reportado en uso real): los videos generados "se reiniciaban"
+  al saltar a un punto. Causa: MediaRecorder emite video de STREAMING
+  (duración ∞, sin índice de seek) y el muxer WebM propio no escribía Cues.
+- El muxer WebM ahora emite SeekHead + Duration + Cues; los CuePoints solo
+  apuntan a clusters que empiezan con keyframe de video (apuntar a un cluster
+  sin keyframe rompe la decodificación tras el salto).
+- remuxWebM: parser EBML propio que repara la salida de MediaRecorder SIN
+  re-codificar (soporta Segment/Clusters de tamaño desconocido, conserva la
+  pista de audio, recalcula la duración desde los bloques). Validado con
+  ffmpeg/ffprobe (duración, seek y conteo de frames exactos).
+- MP4 de verdad: muxer ISO BMFF progresivo propio (ftyp + moov con
+  stts/stss/stsc/stsz/stco + mdat, faststart) + WebCodecs H.264
+  (prefer-hardware) → WebP/GIF a MP4 más rápido que tiempo real y con seek
+  perfecto. remuxMP4 convierte el MP4 fragmentado de MediaRecorder (moof) a
+  progresivo copiando los samples byte a byte, audio incluido.
+- validateVideoBlob ahora exige duración FINITA además de decodificar: un
+  video sin duración ya no se da por bueno.
+- Rediseño completo de la UI: paleta slate + acento cian, grid responsivo de
+  tarjetas (2 columnas en pantallas anchas), dropzone que se compacta al
+  cargar archivos, tarjetas con franja de estado, miniaturas @2x, modal y
+  toasts renovados. Misma estructura de IDs: los tests de DOM siguen pasando.
+
 QUÉ MEJORARÍA CON MÁS TIEMPO / BACKEND
-- Muxer MP4 (ISO BMFF) + WebCodecs para codificar video más rápido que
-  tiempo real y con control de bitrate exacto.
+- Re-codificación de video→video también por WebCodecs (hoy usa MediaRecorder
+  en tiempo real + remux; con VideoDecoder haría falta demuxear el origen).
 - Dithering Floyd-Steinberg opcional en el GIF (mejor degradado, más grano).
 - Decodificador VP8/VP8L propio en WASM para animados en Firefox/Safari.
 - streamsaver/File System Access API para ZIPs de varios GB sin mantenerlos

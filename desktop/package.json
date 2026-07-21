@@ -2,7 +2,7 @@
   "name": "webp-forge",
   "productName": "WebP Forge",
   "description": "Convertidor universal de imágenes y video — 100% local",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "private": true,
   "author": "Steven Carrillo <stevencarrilloloor@gmail.com>",
   "repository": {

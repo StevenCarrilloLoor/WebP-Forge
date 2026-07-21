@@ -1,7 +1,10 @@
 'use strict';
 /* ============================================================
-   WEBP FORGE — APP v1.1 (UI, pipeline de conversión, cola, ZIP)
-   Entradas: WebP (estático/animado), WebM, MP4
+   WEBP FORGE — APP v1.5 (UI, pipeline de conversión, cola, ZIP)
+   Entradas: WebP, GIF, PNG, JPG, BMP, WebM, MP4, ZIP
+   v1.5: videos BUSCABLES (Cues/moov + remux post-MediaRecorder),
+   MP4 acelerado con WebCodecs H.264 + muxer ISO BMFF propio,
+   rediseño completo de la interfaz.
    ============================================================ */
 
 // ---------- Capacidades del navegador ----------
@@ -52,7 +55,14 @@ const stats = { startedAt: 0, batchDone: 0, batchTotal: 0, times: [] };
 const $ = (s, el) => (el || document).querySelector(s);
 const $$ = (s, el) => [...(el || document).querySelectorAll(s)];
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-const raf = () => new Promise(r => requestAnimationFrame(r));
+// requestAnimationFrame NO dispara con la pestaña en segundo plano: sin el
+// fallback por timer, las conversiones se CONGELABAN al minimizar la ventana.
+const raf = () => new Promise(r => {
+  let done = false;
+  const go = () => { if (!done) { done = true; r(); } };
+  requestAnimationFrame(go);
+  setTimeout(go, 60);
+});
 function humanSize(b) {
   if (b == null) return '—';
   if (b < 1024) return b + ' B';
@@ -179,14 +189,16 @@ async function walkEntry(entry, out) {
   }
 }
 
-// Lee metadatos de un video con un elemento <video> (con timeout de seguridad)
+// Lee metadatos de un video con un elemento <video> (con timeout de seguridad).
+// preload='auto' + play() silencioso: en pestañas en segundo plano Chrome
+// APLAZA la carga de <video> y loadedmetadata no llegaba nunca (timeout).
 function probeVideo(file) {
   return new Promise((res, rej) => {
     const url = URL.createObjectURL(file);
     const v = document.createElement('video');
     const timer = setTimeout(() => { cleanup(); rej(new Error('timeout leyendo metadatos')); }, 15000);
-    const cleanup = () => { clearTimeout(timer); URL.revokeObjectURL(url); v.removeAttribute('src'); v.load(); };
-    v.preload = 'metadata'; v.muted = true;
+    const cleanup = () => { clearTimeout(timer); try { v.pause(); } catch {} URL.revokeObjectURL(url); v.removeAttribute('src'); v.load(); };
+    v.preload = 'auto'; v.muted = true; v.playsInline = true;
     v.onloadedmetadata = () => {
       const out = { width: v.videoWidth, height: v.videoHeight, durationMs: Math.round((v.duration || 0) * 1000) };
       cleanup();
@@ -195,6 +207,9 @@ function probeVideo(file) {
     };
     v.onerror = () => { cleanup(); rej(new Error('códec no soportado por este navegador')); };
     v.src = url;
+    v.load();
+    const p = v.play();
+    if (p && p.catch) p.catch(() => {}); // solo fuerza la carga; el autoplay puede fallar sin problema
   });
 }
 
@@ -422,11 +437,12 @@ const thumbObserver = new IntersectionObserver(async (obs) => {
     if (!entry) continue;
     try {
       let w, h, draw;
+      const TH = 184; // 92px CSS × 2 para nitidez en pantallas retina
       if (entry.kind === 'video' && entry.info && entry.info.valid) {
         const { v, url } = await videoElement(entry);
         await seekTo(v, Math.min(0.1, (v.duration || 1) / 10));
         w = v.videoWidth; h = v.videoHeight; draw = v;
-        const s = 74 / Math.max(w, h);
+        const s = TH / Math.max(w, h);
         const c = document.createElement('canvas');
         c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(h * s));
         c.getContext('2d').drawImage(draw, 0, 0, c.width, c.height);
@@ -434,7 +450,7 @@ const thumbObserver = new IntersectionObserver(async (obs) => {
         URL.revokeObjectURL(url);
       } else {
         const bmp = await createImageBitmap(entry.file); // primer frame del webp
-        const s = 74 / Math.max(bmp.width, bmp.height);
+        const s = TH / Math.max(bmp.width, bmp.height);
         const c = document.createElement('canvas');
         c.width = Math.max(1, Math.round(bmp.width * s));
         c.height = Math.max(1, Math.round(bmp.height * s));
@@ -655,7 +671,9 @@ async function videoToVideo(entry, wantMp4, onProg) {
       }
       throw new Error('MediaRecorder no produjo datos — códec posiblemente no soportado');
     }
-    return { blob: new Blob(chunks, { type: mime.split(';')[0] }), ext, fellBack: wantMp4 && !useMp4 };
+    onProg(`Reparando índice de seek…`, 97);
+    const blob = await fixSeekableBlob(new Blob(chunks, { type: mime.split(';')[0] }), ext);
+    return { blob, ext, fellBack: wantMp4 && !useMp4 };
   } finally { URL.revokeObjectURL(url); }
 }
 
@@ -689,6 +707,23 @@ function encodeGifInWorker(frames, w, h, loop, onProg) {
     wk.onerror = (e) => { rej(new Error(e.message || 'Error en worker GIF')); wk.terminate(); };
     wk.postMessage({ frames, width: w, height: h, loop }, frames.map(f => f.data));
   });
+}
+
+// ---------- Post-proceso: hacer BUSCABLE lo que graba MediaRecorder ----------
+// MediaRecorder emite video "de streaming": sin duración (∞) y sin índice de
+// seek → al hacer clic en la barra el video se reiniciaba. Se remuxea el
+// contenedor (sin re-codificar) con Duration + Cues (WebM) o moov progresivo
+// (MP4). Si el remux fallara, se entrega el original (nunca peor).
+async function fixSeekableBlob(blob, ext) {
+  try {
+    const buf = new Uint8Array(await blob.arrayBuffer());
+    if (ext === 'webm') return new Blob([remuxWebM(buf)], { type: 'video/webm' });
+    if (ext === 'mp4') {
+      const out = remuxMP4(buf);
+      return out ? new Blob([out], { type: 'video/mp4' }) : blob;
+    }
+  } catch (e) { console.warn('Remux post-grabación falló; se entrega el original:', e); }
+  return blob;
 }
 
 // ---------- Video desde frames (WebP animado → MP4/WebM, tiempo real) ----------
@@ -745,7 +780,9 @@ async function framesToVideo(frames, w, h, wantMp4, onProg) {
     }
     throw new Error('MediaRecorder no produjo datos — códec posiblemente no soportado');
   }
-  return { blob: new Blob(chunks, { type: mime.split(';')[0] }), ext, fellBack: wantMp4 && !useMp4 };
+  onProg && onProg('Reparando índice de seek…', 97);
+  const blob = await fixSeekableBlob(new Blob(chunks, { type: mime.split(';')[0] }), ext);
+  return { blob, ext, fellBack: wantMp4 && !useMp4 };
 }
 
 // ---------- WebP animado desde frames (canvas → webp estático → muxer propio) ----------
@@ -815,13 +852,78 @@ async function framesToWebMFast(frames, w, h, onProg) {
   if (!blocks.length) throw new Error('VideoEncoder no produjo chunks');
   return new Blob([buildWebM(codecId, W, H, blocks, ts)], { type: 'video/webm' });
 }
-// Comprueba que un blob de video es decodificable antes de darlo por bueno
+
+// ---------- MP4 acelerado: WebCodecs H.264 + muxer ISO BMFF propio ----------
+// MP4 real, con moov progresivo y seek perfecto, codificado más rápido que
+// tiempo real (encoder por hardware si el sistema lo expone). En Electron el
+// H.264 no está disponible → isConfigSupported dirá que no y se cae al
+// camino clásico (que a su vez degrada a WebM con aviso).
+async function framesToMP4Fast(frames, w, h, onProg) {
+  const W = Math.max(2, w & ~1), H = Math.max(2, h & ~1);
+  let codec = null, hwConfig = null;
+  for (const c of ['avc1.640033', 'avc1.4D0033', 'avc1.42E01E', 'avc1.42001E']) { // High/Main L5.1 → Baseline
+    try {
+      const hw = await VideoEncoder.isConfigSupported({ codec: c, width: W, height: H, avc: { format: 'avc' }, hardwareAcceleration: 'prefer-hardware' });
+      if (hw.supported) { codec = c; hwConfig = 'prefer-hardware'; break; }
+    } catch {}
+    try {
+      const sup = await VideoEncoder.isConfigSupported({ codec: c, width: W, height: H, avc: { format: 'avc' } });
+      if (sup.supported) { codec = c; hwConfig = null; break; }
+    } catch {}
+  }
+  if (!codec) throw new Error('VideoEncoder sin soporte H.264 en este entorno');
+  let description = null, encError = null;
+  const samples = [];
+  const enc = new VideoEncoder({
+    output: (chunk, meta) => {
+      if (!description && meta && meta.decoderConfig && meta.decoderConfig.description) {
+        description = new Uint8Array(meta.decoderConfig.description instanceof ArrayBuffer ? meta.decoderConfig.description : meta.decoderConfig.description.buffer);
+      }
+      const d = new Uint8Array(chunk.byteLength);
+      chunk.copyTo(d);
+      samples.push({ data: d, key: chunk.type === 'key', durUs: chunk.duration || 0 });
+    },
+    error: (e) => { encError = e; }
+  });
+  const cfg = { codec, width: W, height: H, bitrate: 16_000_000, avc: { format: 'avc' } };
+  if (hwConfig) cfg.hardwareAcceleration = hwConfig;
+  enc.configure(cfg);
+  const c = makeCanvas(W, H);
+  const ctx = c.getContext('2d');
+  const delayOf = (i) => frames.length === 1 ? 3000 : Math.max(frames[i].delayMs, 10);
+  let ts = 0;
+  for (let i = 0; i < frames.length; i++) {
+    ctx.drawImage(frames[i].bmp, 0, 0, W, H);
+    const vf = new VideoFrame(c, { timestamp: ts * 1000, duration: delayOf(i) * 1000 });
+    enc.encode(vf, { keyFrame: i % 60 === 0 });
+    vf.close();
+    ts += delayOf(i);
+    onProg && onProg(`Codificando ⚡H.264 ${i + 1}/${frames.length}`, 40 + (i + 1) / frames.length * 50);
+    if (i % 10 === 9) await raf();
+  }
+  await enc.flush();
+  enc.close();
+  if (encError) throw encError;
+  if (!samples.length) throw new Error('VideoEncoder no produjo muestras');
+  if (!description) throw new Error('El encoder no entregó avcC (description)');
+  const TS = 90000; // timescale estándar de video
+  let i = 0;
+  const mp4 = buildMP4([{
+    kind: 'video', timescale: TS, W, H,
+    sampleEntry: avc1SampleEntry(W, H, description),
+    samples: samples.map(s => ({ data: s.data, key: s.key, dur: Math.max(1, Math.round(delayOf(i++) * TS / 1000)) })),
+  }]);
+  return new Blob([mp4], { type: 'video/mp4' });
+}
+
+// Comprueba que un blob de video es decodificable Y buscable antes de darlo
+// por bueno (dimensiones válidas + duración finita, sin la cual no hay seek)
 function validateVideoBlob(blob) {
   return new Promise((res) => {
     const url = URL.createObjectURL(blob);
     const v = document.createElement('video');
     const t = setTimeout(() => { URL.revokeObjectURL(url); res(false); }, 8000);
-    v.onloadedmetadata = () => { clearTimeout(t); URL.revokeObjectURL(url); res(v.videoWidth > 0); };
+    v.onloadedmetadata = () => { clearTimeout(t); URL.revokeObjectURL(url); res(v.videoWidth > 0 && isFinite(v.duration) && v.duration > 0); };
     v.onerror = () => { clearTimeout(t); URL.revokeObjectURL(url); res(false); };
     v.src = url;
   });
@@ -939,14 +1041,17 @@ async function convertEntry(entry) {
           (p) => setProgress(entry, `Codificando frame ${Math.round(p * frames.length)}/${frames.length} (LZW)`, 52 + p * 45));
       } else if (fmt === 'mp4' || fmt === 'webm') {
         let r = null;
-        // ⚡ Vía rápida: WebCodecs (encoder por hardware si existe) + muxer WebM propio.
+        // ⚡ Vía rápida: WebCodecs (encoder por hardware si existe) + muxer propio
+        // (WebM con Cues o MP4 progresivo — ambos con seek correcto).
         // El resultado se VALIDA decodificándolo; si algo falla → MediaRecorder clásico.
-        if (fmt === 'webm' && SETTINGS.gpu && CAP.webcodecs && typeof VideoFrame !== 'undefined' && frames.length > 1) {
+        if (SETTINGS.gpu && CAP.webcodecs && typeof VideoFrame !== 'undefined') {
           try {
-            const fast = await framesToWebMFast(frames, W, H, (t, p) => setProgress(entry, t, p));
-            setProgress(entry, 'Validando WebM generado…', 95);
+            const fast = fmt === 'webm'
+              ? await framesToWebMFast(frames, W, H, (t, p) => setProgress(entry, t, p))
+              : await framesToMP4Fast(frames, W, H, (t, p) => setProgress(entry, t, p));
+            setProgress(entry, `Validando ${fmt.toUpperCase()} generado…`, 95);
             if (await validateVideoBlob(fast)) {
-              r = { blob: fast, ext: 'webm', fellBack: false };
+              r = { blob: fast, ext: fmt, fellBack: false };
               entry.fallbackNote = 'codificado con WebCodecs (acelerado, más rápido que tiempo real)';
             }
           } catch (e) { console.warn('Vía WebCodecs falló; fallback a MediaRecorder:', e); }
@@ -1141,6 +1246,7 @@ $('#search').addEventListener('input', (e) => { searchTerm = e.target.value.toLo
 
 function refreshCounters() {
   const all = [...FILES.values()];
+  document.body.classList.toggle('has-files', all.length > 0); // compacta la dropzone
   const done = all.filter(e => e.status === 'done').length;
   const proc = all.filter(e => e.status === 'processing').length;
   $('#global-counter').innerHTML = `<b>${all.length}</b> archivos &nbsp;|&nbsp; <b>${done}</b> completados &nbsp;|&nbsp; <b>${proc}</b> procesando`;
@@ -1279,4 +1385,4 @@ window.addEventListener('beforeunload', () => {
 });
 
 // Hook de depuración/integración (consola): window.WEBPFORGE
-window.WEBPFORGE = { version: '1.4.1', SETTINGS, FILES, CAP, addFiles, parseWebP, detectContainer };
+window.WEBPFORGE = { version: '1.5.0', SETTINGS, FILES, CAP, addFiles, parseWebP, detectContainer };
