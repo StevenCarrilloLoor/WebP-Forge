@@ -126,9 +126,15 @@ async function detectGPU() {
     }
   } catch {}
   // Limpiar envoltorio ANGLE y sufijos de API: "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 Direct3D11...)" → "NVIDIA GeForce RTX 5080"
+  // Nota: el nombre puede contener paréntesis ("Intel(R)"), así que NO se puede
+  // cortar en el primer ")": se separa por comas de nivel superior.
   let pretty = name;
-  const m = /ANGLE \(([^,]+),\s*([^,)]+)/.exec(name);
-  if (m) pretty = m[2];
+  const angle = /^ANGLE \((.+)\)$/.exec(name.trim());
+  if (angle) {
+    const parts = angle[1].split(', ');
+    if (parts.length >= 3) pretty = parts.slice(1, -1).join(', ');
+    else if (parts.length === 2) pretty = parts[1];
+  }
   pretty = pretty.replace(/\s*\(0x[0-9A-Fa-f]+\)/g, '').replace(/\s+(Direct3D|D3D|OpenGL|Vulkan|Metal).*$/i, '').trim();
   return pretty;
 }

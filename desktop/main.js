@@ -2,6 +2,22 @@
 const { app, BrowserWindow, shell, Notification } = require('electron');
 const path = require('path');
 
+// En equipos híbridos (Intel integrada + NVIDIA/AMD dedicada) Windows asigna
+// la GPU por proceso y por defecto toca la integrada. La app registra su
+// preferencia de ALTO RENDIMIENTO en el perfil del usuario (lo mismo que
+// hace Configuración > Sistema > Pantalla > Gráficos, donde se puede
+// cambiar/revertir). Surte efecto a partir del siguiente arranque.
+function preferDedicatedGPU() {
+  if (process.platform !== 'win32') return;
+  try {
+    const { execFile } = require('child_process');
+    execFile('reg', ['add', 'HKCU\\Software\\Microsoft\\DirectX\\UserGpuPreferences',
+      '/v', process.execPath, '/t', 'REG_SZ', '/d', 'GpuPreference=2;', '/f'], () => {});
+  } catch {}
+}
+preferDedicatedGPU();
+app.commandLine.appendSwitch('force_high_performance_gpu'); // equivalente en macOS
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1280, height: 880, minWidth: 900, minHeight: 600,
