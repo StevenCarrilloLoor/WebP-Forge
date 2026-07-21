@@ -97,22 +97,32 @@ function toast(msg, kind, ms) {
 // ---------- Detección de GPU (nombre real + encoder por hardware) ----------
 async function detectGPU() {
   let name = '';
+  // En equipos HÍBRIDOS (Intel integrada + NVIDIA/AMD dedicada) Chromium corre
+  // por defecto en la integrada: hay que pedir EXPLÍCITAMENTE el adaptador de
+  // alto rendimiento para ver la GPU dedicada del equipo.
   // WebGPU: adapter.info (Chrome 121+) da vendor/description
   try {
     if (navigator.gpu) {
-      const ad = await navigator.gpu.requestAdapter();
+      const ad = (await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' })) || (await navigator.gpu.requestAdapter());
       const info = ad && (ad.info || (ad.requestAdapterInfo ? await ad.requestAdapterInfo() : null));
       if (info) name = info.description || info.device || info.vendor || '';
     }
   } catch {}
   // WebGL: UNMASKED_RENDERER suele dar el modelo exacto ("ANGLE (NVIDIA, NVIDIA GeForce RTX 5080...)")
   try {
-    const c = document.createElement('canvas');
-    const gl = c.getContext('webgl2') || c.getContext('webgl');
+    let gl = null;
+    for (const type of ['webgl2', 'webgl']) {
+      gl = document.createElement('canvas').getContext(type, { powerPreference: 'high-performance' });
+      if (gl) break;
+    }
+    if (!gl) for (const type of ['webgl2', 'webgl']) { gl = document.createElement('canvas').getContext(type); if (gl) break; }
     if (gl) {
       const ext = gl.getExtension('WEBGL_debug_renderer_info');
       const r = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER) || '');
-      if (r.length > name.length) name = r;
+      // Preferir el nombre de la GPU DEDICADA si aparece; si no, el más largo
+      const esDedicada = /NVIDIA|GeForce|RTX|GTX|Radeon(?! .*Graphics)/i;
+      if (esDedicada.test(r) && !esDedicada.test(name)) name = r;
+      else if (r.length > name.length && !esDedicada.test(name)) name = r;
     }
   } catch {}
   // Limpiar envoltorio ANGLE y sufijos de API: "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 Direct3D11...)" → "NVIDIA GeForce RTX 5080"
@@ -161,7 +171,8 @@ async function detectGPU() {
   chip.id = 'gpu-chip';
   chip.className = 'chip ' + (pretty ? 'on' : 'off');
   chip.title = (pretty || 'No se pudo identificar la GPU') + ' — encoder de video por hardware: ' +
-    (hwEncode ? 'DISPONIBLE ✓ (la opción más rápida, ya activada)' : 'no expuesto por el navegador para VP8/VP9; se usará WebCodecs por software (también muy rápido)');
+    (hwEncode ? 'DISPONIBLE ✓ (la opción más rápida, ya activada)' : 'no expuesto por el navegador para VP8/VP9; se usará WebCodecs por software (también muy rápido)') +
+    '. En equipos con dos GPU, Windows decide en cuál corre la app: Configuración > Sistema > Pantalla > Gráficos.';
   chip.textContent = '🎮 ' + short + (hwEncode ? ' · HW✓' : '');
   $('#api-status').appendChild(chip);
   const optLabel = $('#opt-gpu') && $('#opt-gpu').closest('label');
