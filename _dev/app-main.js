@@ -386,6 +386,71 @@ async function expandZips(files) {
   return out;
 }
 
+// ---------- ESTRATEGIAS DE ANÁLISIS por contenedor (patrón Strategy) ----------
+// Cada estrategia recibe (entry, file, head, blank) y rellena entry.kind /
+// entry.info (o lo marca invalid). Añadir soporte a un contenedor nuevo =
+// registrar una entrada más, sin tocar addFiles.
+const INFO_BLANK = () => ({ hasAlpha: false, hasICC: false, hasEXIF: false, hasXMP: false, truncated: false, loopCount: 0, durationMs: 0 });
+async function analizarWebP(entry, file, head) {
+  entry.kind = 'webp';
+  let info = parseWebP(head, file.size);
+  if (info.valid && info.animated) info = parseWebP(await file.arrayBuffer(), file.size);
+  entry.info = info;
+  if (!info.valid) { entry.status = 'invalid'; entry.error = info.reason; }
+}
+async function analizarGIF(entry, file, head, blank) {
+  const g = parseGIF(await file.arrayBuffer());
+  entry.kind = g.animated ? 'gif' : 'image';
+  entry.info = { ...blank, valid: g.width > 0 && g.height > 0, type: 'gif', animated: g.animated,
+                 frames: g.frames, width: g.width, height: g.height, durationMs: g.durationMs, loopCount: g.loopCount };
+  if (!entry.info.valid) { entry.status = 'invalid'; entry.error = 'GIF con header inválido'; }
+}
+function analizadorImagen(container) {
+  return async (entry, file, head, blank) => {
+    entry.kind = 'image';
+    let dims = container === 'png' ? parsePNG(head)
+             : container === 'bmp' ? parseBMP(head)
+             : parseJPEG(await file.slice(0, 1048576).arrayBuffer());
+    if (!dims || !dims.width || !dims.height) {
+      // Fallback: que el navegador decodifique las dimensiones
+      try { const bmp = await createImageBitmap(file); dims = { width: bmp.width, height: bmp.height }; bmp.close(); }
+      catch { dims = null; }
+    }
+    if (dims) entry.info = { ...blank, valid: true, type: container, animated: false, frames: 1, width: dims.width, height: dims.height };
+    else { entry.status = 'invalid'; entry.info = { valid: false }; entry.error = 'No se pudieron leer las dimensiones de la imagen'; }
+  };
+}
+function analizadorVideo(container) {
+  return async (entry, file, head, blank) => {
+    entry.kind = 'video';
+    try {
+      let m;
+      try { m = await probeVideo(file); }
+      catch (e1) { m = await probeVideoBinary(file, container); } // <video> colgado → parsers propios
+      const audio = await hasAudioTrack(file, container);
+      entry.info = { ...blank, valid: true, video: true, type: container, animated: true, frames: 0,
+                     width: m.width, height: m.height, durationMs: m.durationMs || 0, hasAudio: audio };
+    } catch (err) {
+      entry.status = 'invalid'; entry.info = { valid: false };
+      entry.error = `Video ${container.toUpperCase()} detectado, pero no se puede decodificar: ${err.message}`;
+    }
+  };
+}
+async function analizarDesconocido(entry) {
+  entry.status = 'invalid'; entry.info = { valid: false };
+  entry.error = 'Formato no reconocido (acepto WebP, GIF, PNG, JPG, BMP, WebM, MP4, ZIP)';
+}
+const ANALIZADORES = {
+  webp: analizarWebP,
+  gif: analizarGIF,
+  png: analizadorImagen('png'),
+  jpg: analizadorImagen('jpg'),
+  bmp: analizadorImagen('bmp'),
+  webm: analizadorVideo('webm'),
+  mp4: analizadorVideo('mp4'),
+  mkv: analizadorVideo('mkv'),
+};
+
 async function addFiles(fileList) {
   const all = await expandZips([...fileList]);
   const accepted = all.filter(f => ACCEPT_RE.test(f.name) || ACCEPT_TYPES.includes(f.type));
@@ -410,48 +475,8 @@ async function addFiles(fileList) {
     try {
       const head = await file.slice(0, 4096).arrayBuffer();
       const container = detectContainer(head);
-      const blank = { hasAlpha: false, hasICC: false, hasEXIF: false, hasXMP: false, truncated: false, loopCount: 0, durationMs: 0 };
-      if (container === 'webp') {
-        entry.kind = 'webp';
-        let info = parseWebP(head, file.size);
-        if (info.valid && info.animated) info = parseWebP(await file.arrayBuffer(), file.size);
-        entry.info = info;
-        if (!info.valid) { entry.status = 'invalid'; entry.error = info.reason; }
-      } else if (container === 'gif') {
-        const g = parseGIF(await file.arrayBuffer());
-        entry.kind = g.animated ? 'gif' : 'image';
-        entry.info = { ...blank, valid: g.width > 0 && g.height > 0, type: 'gif', animated: g.animated,
-                       frames: g.frames, width: g.width, height: g.height, durationMs: g.durationMs, loopCount: g.loopCount };
-        if (!entry.info.valid) { entry.status = 'invalid'; entry.error = 'GIF con header inválido'; }
-      } else if (container === 'png' || container === 'jpg' || container === 'bmp') {
-        entry.kind = 'image';
-        let dims = container === 'png' ? parsePNG(head)
-                 : container === 'bmp' ? parseBMP(head)
-                 : parseJPEG(await file.slice(0, 1048576).arrayBuffer());
-        if (!dims || !dims.width || !dims.height) {
-          // Fallback: que el navegador decodifique las dimensiones
-          try { const bmp = await createImageBitmap(file); dims = { width: bmp.width, height: bmp.height }; bmp.close(); }
-          catch { dims = null; }
-        }
-        if (dims) entry.info = { ...blank, valid: true, type: container, animated: false, frames: 1, width: dims.width, height: dims.height };
-        else { entry.status = 'invalid'; entry.info = { valid: false }; entry.error = 'No se pudieron leer las dimensiones de la imagen'; }
-      } else if (container === 'webm' || container === 'mp4' || container === 'mkv') {
-        entry.kind = 'video';
-        try {
-          let m;
-          try { m = await probeVideo(file); }
-          catch (e1) { m = await probeVideoBinary(file, container); } // <video> colgado → parsers propios
-          const audio = await hasAudioTrack(file, container);
-          entry.info = { ...blank, valid: true, video: true, type: container, animated: true, frames: 0,
-                         width: m.width, height: m.height, durationMs: m.durationMs || 0, hasAudio: audio };
-        } catch (err) {
-          entry.status = 'invalid'; entry.info = { valid: false };
-          entry.error = `Video ${container.toUpperCase()} detectado, pero no se puede decodificar: ${err.message}`;
-        }
-      } else {
-        entry.status = 'invalid'; entry.info = { valid: false };
-        entry.error = 'Formato no reconocido (acepto WebP, GIF, PNG, JPG, BMP, WebM, MP4, ZIP)';
-      }
+      const analizar = ANALIZADORES[container] || analizarDesconocido;
+      await analizar(entry, file, head, INFO_BLANK());
       if (entry.status !== 'invalid' && entry.info && entry.info.valid) entry.format = defaultFormatFor(entry);
     } catch (err) {
       entry.status = 'invalid'; entry.info = { valid: false };
@@ -1300,6 +1325,182 @@ function setProgress(entry, text, pct) {
 }
 function baseName(n) { return n.replace(/\.(webp|webm|mp4|m4v|gif|png|jpe?g|bmp)$/i, ''); }
 
+/* ============================================================
+   ESTRATEGIAS DE CONVERSIÓN (patrón Strategy)
+   Contrato: estrategia = { nombre, aplica?(ctx), run(ctx) } donde run
+   devuelve { blob, ext?, nota? } o null ("no pude; prueba la siguiente").
+   - ejecutarCadena recorre una lista de estrategias en orden (las cadenas
+     de fallback dejan de ser ifs anidados y quedan DECLARADAS).
+   - CONVERSORES_VIDEO / CONVERSORES_FRAMES son los registros por formato:
+     añadir un formato nuevo = registrar una entrada, sin tocar convertEntry.
+   ============================================================ */
+async function ejecutarCadena(estrategias, ctx) {
+  for (const est of estrategias) {
+    if (est.aplica && !est.aplica(ctx)) continue;
+    try {
+      const r = await est.run(ctx);
+      if (r) return r;
+    } catch (e) { console.warn(`Estrategia "${est.nombre}" falló; sigo con la siguiente:`, (e && e.name ? e.name + ': ' + e.message : e)); }
+  }
+  return null;
+}
+
+// ---- Video → MP4/WebM: cadena de 3 niveles (antes ifs anidados) ----
+const ESTRATEGIAS_VIDEO_A_VIDEO = [
+  {
+    nombre: 'transcodificación WebCodecs (demux propio, sin audio)',
+    aplica: ({ entry, fmt }) => fmt === 'mp4' && SETTINGS.gpu && CAP.webcodecs && CAP.mp4Fast &&
+      !entry.info.hasAudio && (entry.info.type === 'webm' || entry.info.type === 'mkv'),
+    run: async ({ entry, prog }) => {
+      const b = await videoToMP4Fast(entry, prog);
+      prog('Validando MP4 generado…', 95);
+      if (!(await validateVideoBlob(b, 'mp4'))) return null;
+      return { blob: b, ext: 'mp4', nota: 'transcodificado con WebCodecs (H.264 acelerado, más rápido que tiempo real)' };
+    },
+  },
+  {
+    nombre: 'captura rVFC en tiempo real (sin audio)',
+    aplica: ({ entry, fmt }) => fmt === 'mp4' && SETTINGS.gpu && CAP.webcodecs && CAP.mp4Fast && !entry.info.hasAudio,
+    run: async ({ entry, prog }) => {
+      const b = await videoToMP4Capture(entry, prog);
+      prog('Validando MP4 generado…', 95);
+      if (!(await validateVideoBlob(b, 'mp4'))) return null;
+      return { blob: b, ext: 'mp4', nota: 'MP4 codificado con WebCodecs H.264 (captura en tiempo real)' };
+    },
+  },
+  {
+    nombre: 'MediaRecorder clásico (conserva audio)',
+    run: async ({ entry, fmt, prog }) => {
+      prog(`Re-codificando video (~${(entry.info.durationMs / 1000).toFixed(1)}s, tiempo real)…`, 4);
+      const r = await videoToVideo(entry, fmt === 'mp4', prog);
+      const nota = r.fellBack
+        ? ((entry.info.hasAudio && CAP.mp4Fast)
+          ? 'Se generó WebM para CONSERVAR el audio (aquí el MP4 solo es posible sin pista de audio).'
+          : 'Este navegador no graba MP4: se generó WebM.')
+        : '';
+      return { blob: r.blob, ext: r.ext, nota };
+    },
+  },
+];
+
+// ---- Frames (WebP/GIF/imagen) → MP4/WebM: vía rápida + clásica ----
+const ESTRATEGIAS_FRAMES_A_VIDEO = [
+  {
+    nombre: '⚡ WebCodecs + muxer propio',
+    aplica: () => SETTINGS.gpu && CAP.webcodecs && typeof VideoFrame !== 'undefined',
+    run: async ({ frames, W, H, fmt, prog }) => {
+      const fast = fmt === 'webm'
+        ? await framesToWebMFast(frames, W, H, prog)
+        : await framesToMP4Fast(frames, W, H, prog);
+      prog(`Validando ${fmt.toUpperCase()} generado…`, 95);
+      if (!(await validateVideoBlob(fast, fmt))) return null;
+      return { blob: fast, ext: fmt, nota: 'codificado con WebCodecs (acelerado, más rápido que tiempo real)' };
+    },
+  },
+  {
+    nombre: 'MediaRecorder clásico',
+    run: async ({ entry, frames, W, H, fmt, prog }) => {
+      const secs = entry.info.animated ? (frames.reduce((a, f) => a + Math.max(f.delayMs, 33), 0) / 1000).toFixed(1) : 3;
+      prog(`Grabando video en tiempo real (~${secs}s)…`, 40);
+      const r = await framesToVideo(frames, W, H, fmt === 'mp4', prog);
+      return { blob: r.blob, ext: r.ext, nota: r.fellBack ? 'Este navegador no graba MP4: se generó WebM (puedes convertirlo a MP4 con cualquier herramienta local).' : '' };
+    },
+  },
+];
+
+// ---- Registro: entrada de VIDEO → formato de salida ----
+const primerFrameDeVideo = (fmt) => async ({ entry, prog }) => {
+  prog('Extrayendo primer frame…', 30);
+  const r = await videoFirstFrame(entry);
+  prog(`Codificando ${fmt.toUpperCase()}…`, 60);
+  let blob;
+  if (fmt === 'bmp') blob = new Blob([encodeBMP(r.imageData.data, r.W, r.H)], { type: 'image/bmp' });
+  else {
+    const c = makeCanvas(r.W, r.H);
+    const ctx = c.getContext('2d');
+    if (fmt === 'jpg') { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, r.W, r.H); }
+    ctx.putImageData ? ctx.putImageData(r.imageData, 0, 0) : null;
+    if (fmt === 'jpg') { // putImageData pisa el fondo; recomponer
+      ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, r.W, r.H);
+      ctx.drawImage(r.canvas, 0, 0);
+    }
+    blob = await canvasToBlob(c, fmt === 'png' ? 'image/png' : 'image/jpeg', entry.quality / 100);
+  }
+  return { blob, ext: fmt, nota: 'Se usó el primer frame del video.' };
+};
+const CONVERSORES_VIDEO = {
+  mp4: (ctx) => ejecutarCadena(ESTRATEGIAS_VIDEO_A_VIDEO, ctx),
+  webm: (ctx) => ejecutarCadena(ESTRATEGIAS_VIDEO_A_VIDEO, ctx),
+  gif: async ({ entry, prog }) => {
+    const r = await videoFrames(entry, prog);
+    prog('Cuantizando y codificando GIF (LZW)…', 52);
+    const blob = await encodeGifInWorker(r.frames, r.W, r.H, 0,
+      (p) => prog(`Codificando GIF ${Math.round(p * 100)}% (LZW)`, 52 + p * 45));
+    return { blob, ext: 'gif', nota: r.note ? 'GIF ' + r.note + ' para controlar memoria y tamaño.' : '' };
+  },
+  webp: async ({ entry, prog }) => {
+    if (!CAP.webpEnc) throw new Error('Este navegador no puede codificar WebP de salida');
+    const r = await videoFrames(entry, prog);
+    const c2 = makeCanvas(r.W, r.H);
+    const ctx2 = c2.getContext('2d');
+    const enc = [];
+    for (let i = 0; i < r.frames.length; i++) {
+      ctx2.putImageData(new ImageData(new Uint8ClampedArray(r.frames[i].data), r.W, r.H), 0, 0);
+      const fb = await canvasToBlob(c2, 'image/webp', entry.quality / 100);
+      enc.push({ bytes: new Uint8Array(await fb.arrayBuffer()), delayMs: r.frames[i].delayMs });
+      prog(`Codificando frame WebP ${i + 1}/${r.frames.length}`, 55 + (i + 1) / r.frames.length * 42);
+    }
+    return { blob: new Blob([buildAnimatedWebP(enc, r.W, r.H, 0)], { type: 'image/webp' }), ext: 'webp', nota: r.note ? 'WebP animado ' + r.note + '.' : '' };
+  },
+  png: primerFrameDeVideo('png'),
+  jpg: primerFrameDeVideo('jpg'),
+  bmp: primerFrameDeVideo('bmp'),
+};
+
+// ---- Registro: entrada de FRAMES (WebP/GIF/imagen) → formato de salida ----
+const estaticoDesdeFrames = (fmt) => async ({ entry, frames, W, H, prog }) => {
+  if (fmt === 'webp' && !CAP.webpEnc) throw new Error('Este navegador no puede codificar WebP de salida');
+  prog(`Codificando ${fmt.toUpperCase()}…`, 60);
+  const c = makeCanvas(W, H);
+  const ctx = c.getContext('2d');
+  if (fmt === 'jpg') { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, W, H); } // JPG no tiene alpha
+  ctx.drawImage(frames[0].bmp, 0, 0);
+  const outMime = fmt === 'png' ? 'image/png' : fmt === 'jpg' ? 'image/jpeg' : 'image/webp';
+  return { blob: await canvasToBlob(c, outMime, entry.quality / 100), ext: fmt };
+};
+const CONVERSORES_FRAMES = {
+  png: estaticoDesdeFrames('png'),
+  jpg: estaticoDesdeFrames('jpg'),
+  webp: async (ctx) => {
+    if (ctx.frames.length === 1) return estaticoDesdeFrames('webp')(ctx);
+    if (!CAP.webpEnc) throw new Error('Este navegador no puede codificar WebP de salida');
+    const { entry, frames, W, H, prog } = ctx;
+    const blob = await framesToAnimatedWebP(frames, W, H, entry.info.loopCount || 0, entry.quality / 100, prog);
+    return { blob, ext: 'webp' };
+  },
+  bmp: async ({ frames, W, H, prog }) => {
+    prog('Codificando BMP…', 60);
+    const id = imageDataFrom(frames[0].bmp, W, H);
+    return { blob: new Blob([encodeBMP(id.data, W, H)], { type: 'image/bmp' }), ext: 'bmp' };
+  },
+  gif: async ({ entry, frames, W, H, prog }) => {
+    // Extraer RGBA de cada frame y delegar cuantización+LZW al worker
+    const payload = [];
+    for (let i = 0; i < frames.length; i++) {
+      prog(`Extrayendo píxeles ${i + 1}/${frames.length}`, 36 + (i / frames.length) * 14);
+      const id = imageDataFrom(frames[i].bmp, W, H);
+      payload.push({ data: id.data.buffer, delayMs: frames[i].delayMs });
+      if (i % 4 === 3) await raf();
+    }
+    prog('Cuantizando y codificando GIF (LZW)…', 52);
+    const blob = await encodeGifInWorker(payload, W, H, entry.info.loopCount || 0,
+      (p) => prog(`Codificando frame ${Math.round(p * frames.length)}/${frames.length} (LZW)`, 52 + p * 45));
+    return { blob, ext: 'gif' };
+  },
+  mp4: (ctx) => ejecutarCadena(ESTRATEGIAS_FRAMES_A_VIDEO, ctx),
+  webm: (ctx) => ejecutarCadena(ESTRATEGIAS_FRAMES_A_VIDEO, ctx),
+};
+
 async function convertEntry(entry) {
   if (entry.status === 'processing' || entry.status === 'invalid') return;
   const els = entry.els;
@@ -1316,152 +1517,31 @@ async function convertEntry(entry) {
   let frames = [];
   try {
     const fmt = entry.format;
-    let blob, ext = fmt;
+    const prog = (t, p) => setProgress(entry, t, p);
+    let resultado;
 
     if (entry.kind === 'video') {
-      // ===== Entrada de VIDEO (WebM/MP4) =====
-      if (fmt === 'mp4' || fmt === 'webm') {
-        let r = null;
-        // ⚡ MP4 sin audio desde WebM/MKV: transcodificación WebCodecs con demux
-        // propio — más rápida que tiempo real y única vía de MP4 real cuando
-        // MediaRecorder no lo graba (app de escritorio).
-        if (fmt === 'mp4' && SETTINGS.gpu && CAP.webcodecs && CAP.mp4Fast && !entry.info.hasAudio) {
-          // Nivel 1: transcodificación (demux propio + VideoDecoder), más rápida que tiempo real
-          if (entry.info.type === 'webm' || entry.info.type === 'mkv') {
-            try {
-              const fast = await videoToMP4Fast(entry, (t, p) => setProgress(entry, t, p));
-              setProgress(entry, 'Validando MP4 generado…', 95);
-              if (await validateVideoBlob(fast, 'mp4')) {
-                r = { blob: fast, ext: 'mp4', fellBack: false };
-                entry.fallbackNote = 'transcodificado con WebCodecs (H.264 acelerado, más rápido que tiempo real)';
-              }
-            } catch (e) { console.warn('Transcodificación WebCodecs falló; pruebo captura rVFC:', (e && (e.name + ': ' + e.message)) || e); }
-          }
-          // Nivel 2: captura rVFC en tiempo real → MP4 real igualmente
-          if (!r) {
-            try {
-              const cap = await videoToMP4Capture(entry, (t, p) => setProgress(entry, t, p));
-              setProgress(entry, 'Validando MP4 generado…', 95);
-              if (await validateVideoBlob(cap, 'mp4')) {
-                r = { blob: cap, ext: 'mp4', fellBack: false };
-                entry.fallbackNote = 'MP4 codificado con WebCodecs H.264 (captura en tiempo real)';
-              }
-            } catch (e) { console.warn('Captura rVFC falló; fallback clásico:', (e && (e.name + ': ' + e.message)) || e); }
-          }
-        }
-        if (!r) {
-          setProgress(entry, `Re-codificando video (~${(entry.info.durationMs/1000).toFixed(1)}s, tiempo real)…`, 4);
-          r = await videoToVideo(entry, fmt === 'mp4', (t, p) => setProgress(entry, t, p));
-        }
-        blob = r.blob; ext = r.ext;
-        if (r.fellBack) entry.fallbackNote = (entry.info.hasAudio && CAP.mp4Fast)
-          ? 'Se generó WebM para CONSERVAR el audio (aquí el MP4 solo es posible sin pista de audio).'
-          : 'Este navegador no graba MP4: se generó WebM.';
-      } else if (fmt === 'gif') {
-        const r = await videoFrames(entry, (t, p) => setProgress(entry, t, p));
-        setProgress(entry, 'Cuantizando y codificando GIF (LZW)…', 52);
-        blob = await encodeGifInWorker(r.frames, r.W, r.H, 0,
-          (p) => setProgress(entry, `Codificando GIF ${Math.round(p * 100)}% (LZW)`, 52 + p * 45));
-        if (r.note) entry.fallbackNote = 'GIF ' + r.note + ' para controlar memoria y tamaño.';
-      } else if (fmt === 'webp') {
-        if (!CAP.webpEnc) throw new Error('Este navegador no puede codificar WebP de salida');
-        const r = await videoFrames(entry, (t, p) => setProgress(entry, t, p));
-        const c2 = makeCanvas(r.W, r.H);
-        const ctx2 = c2.getContext('2d');
-        const enc = [];
-        for (let i = 0; i < r.frames.length; i++) {
-          ctx2.putImageData(new ImageData(new Uint8ClampedArray(r.frames[i].data), r.W, r.H), 0, 0);
-          const fb = await canvasToBlob(c2, 'image/webp', entry.quality / 100);
-          enc.push({ bytes: new Uint8Array(await fb.arrayBuffer()), delayMs: r.frames[i].delayMs });
-          setProgress(entry, `Codificando frame WebP ${i + 1}/${r.frames.length}`, 55 + (i + 1) / r.frames.length * 42);
-        }
-        blob = new Blob([buildAnimatedWebP(enc, r.W, r.H, 0)], { type: 'image/webp' });
-        if (r.note) entry.fallbackNote = 'WebP animado ' + r.note + '.';
-      } else { // png / jpg / bmp → primer frame
-        setProgress(entry, `Extrayendo primer frame…`, 30);
-        const r = await videoFirstFrame(entry);
-        setProgress(entry, `Codificando ${fmt.toUpperCase()}…`, 60);
-        if (fmt === 'bmp') blob = new Blob([encodeBMP(r.imageData.data, r.W, r.H)], { type: 'image/bmp' });
-        else {
-          const c = makeCanvas(r.W, r.H);
-          const ctx = c.getContext('2d');
-          if (fmt === 'jpg') { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, r.W, r.H); }
-          ctx.putImageData ? ctx.putImageData(r.imageData, 0, 0) : null;
-          if (fmt === 'jpg') { // putImageData pisa el fondo; recomponer
-            ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, r.W, r.H);
-            ctx.drawImage(r.canvas, 0, 0);
-          }
-          blob = await canvasToBlob(c, fmt === 'png' ? 'image/png' : 'image/jpeg', entry.quality / 100);
-        }
-        entry.fallbackNote = 'Se usó el primer frame del video.';
-      }
+      // ===== Entrada de VIDEO: despacho por registro de estrategias =====
+      const conv = CONVERSORES_VIDEO[fmt];
+      if (!conv) throw new Error('Formato desconocido: ' + fmt);
+      resultado = await conv({ entry, fmt, prog });
     } else {
-      // ===== Entrada WEBP =====
+      // ===== Entrada de FRAMES (WebP/GIF/imagen): decodificar y despachar =====
       const needAllFrames = (fmt === 'gif' || fmt === 'mp4' || fmt === 'webm' || fmt === 'webp') && entry.info.animated;
       setProgress(entry, 'Leyendo archivo…', 2);
-      frames = await decodeAllFrames(entry, (t, p) => setProgress(entry, t, p), !needAllFrames);
+      frames = await decodeAllFrames(entry, prog, !needAllFrames);
       if (needAllFrames && frames.length === 1 && entry.info.frames > 1) {
         entry.fallbackNote = 'Sin ImageDecoder: solo se usó el primer frame.';
       }
-      const W = frames[0].bmp.width, H = frames[0].bmp.height;
-
-      if (fmt === 'png' || fmt === 'jpg' || (fmt === 'webp' && frames.length === 1)) {
-        if (fmt === 'webp' && !CAP.webpEnc) throw new Error('Este navegador no puede codificar WebP de salida');
-        setProgress(entry, `Codificando ${fmt.toUpperCase()}…`, 60);
-        const c = makeCanvas(W, H);
-        const ctx = c.getContext('2d');
-        if (fmt === 'jpg') { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, W, H); } // JPG no tiene alpha
-        ctx.drawImage(frames[0].bmp, 0, 0);
-        const outMime = fmt === 'png' ? 'image/png' : fmt === 'jpg' ? 'image/jpeg' : 'image/webp';
-        blob = await canvasToBlob(c, outMime, entry.quality / 100);
-      } else if (fmt === 'webp') {
-        if (!CAP.webpEnc) throw new Error('Este navegador no puede codificar WebP de salida');
-        blob = await framesToAnimatedWebP(frames, W, H, entry.info.loopCount || 0, entry.quality / 100,
-          (t, p) => setProgress(entry, t, p));
-      } else if (fmt === 'bmp') {
-        setProgress(entry, 'Codificando BMP…', 60);
-        const id = imageDataFrom(frames[0].bmp, W, H);
-        blob = new Blob([encodeBMP(id.data, W, H)], { type: 'image/bmp' });
-      } else if (fmt === 'gif') {
-        // Extraer RGBA de cada frame y delegar cuantización+LZW al worker
-        const payload = [];
-        for (let i = 0; i < frames.length; i++) {
-          setProgress(entry, `Extrayendo píxeles ${i + 1}/${frames.length}`, 36 + (i / frames.length) * 14);
-          const id = imageDataFrom(frames[i].bmp, W, H);
-          payload.push({ data: id.data.buffer, delayMs: frames[i].delayMs });
-          if (i % 4 === 3) await raf();
-        }
-        setProgress(entry, 'Cuantizando y codificando GIF (LZW)…', 52);
-        blob = await encodeGifInWorker(payload, W, H, entry.info.loopCount || 0,
-          (p) => setProgress(entry, `Codificando frame ${Math.round(p * frames.length)}/${frames.length} (LZW)`, 52 + p * 45));
-      } else if (fmt === 'mp4' || fmt === 'webm') {
-        let r = null;
-        // ⚡ Vía rápida: WebCodecs (encoder por hardware si existe) + muxer propio
-        // (WebM con Cues o MP4 progresivo — ambos con seek correcto).
-        // El resultado se VALIDA decodificándolo; si algo falla → MediaRecorder clásico.
-        if (SETTINGS.gpu && CAP.webcodecs && typeof VideoFrame !== 'undefined') {
-          try {
-            const fast = fmt === 'webm'
-              ? await framesToWebMFast(frames, W, H, (t, p) => setProgress(entry, t, p))
-              : await framesToMP4Fast(frames, W, H, (t, p) => setProgress(entry, t, p));
-            setProgress(entry, `Validando ${fmt.toUpperCase()} generado…`, 95);
-            if (await validateVideoBlob(fast, fmt)) {
-              r = { blob: fast, ext: fmt, fellBack: false };
-              entry.fallbackNote = 'codificado con WebCodecs (acelerado, más rápido que tiempo real)';
-            }
-          } catch (e) { console.warn('Vía WebCodecs falló; fallback a MediaRecorder:', e); }
-        }
-        if (!r) {
-          const secs = entry.info.animated ? (frames.reduce((a, f) => a + Math.max(f.delayMs, 33), 0) / 1000).toFixed(1) : 3;
-          setProgress(entry, `Grabando video en tiempo real (~${secs}s)…`, 40);
-          r = await framesToVideo(frames, W, H, fmt === 'mp4', (t, p) => setProgress(entry, t, p));
-        }
-        blob = r.blob; ext = r.ext;
-        if (r.fellBack) entry.fallbackNote = 'Este navegador no graba MP4: se generó WebM (puedes convertirlo a MP4 con cualquier herramienta local).';
-      } else {
-        throw new Error('Formato desconocido: ' + fmt);
-      }
+      const conv = CONVERSORES_FRAMES[fmt];
+      if (!conv) throw new Error('Formato desconocido: ' + fmt);
+      resultado = await conv({ entry, fmt, frames, W: frames[0].bmp.width, H: frames[0].bmp.height, prog });
     }
+
+    if (!resultado || !resultado.blob) throw new Error('Ninguna estrategia de conversión pudo completar la tarea');
+    const blob = resultado.blob;
+    const ext = resultado.ext || fmt;
+    if (resultado.nota) entry.fallbackNote = resultado.nota;
 
     entry.blob = blob;
     entry.outName = baseName(entry.name) + '.' + ext;
