@@ -11,7 +11,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { buildWebM, remuxWebM, buildMP4, remuxMP4, avc1SampleEntry } = require('./core.js');
+const { buildWebM, remuxWebM, buildMP4, remuxMP4, avc1SampleEntry, webmHasAudio, mp4HasAudio, extractWebMVideoBlocks, webmQuickMeta, mp4QuickMeta } = require('./core.js');
 
 let pass = 0, fail = 0;
 const check = (n, c, x) => { if (c) { pass++; console.log('PASS', n); } else { fail++; console.log('FAIL', n, x || ''); } };
@@ -192,6 +192,42 @@ function ivfBlocks() {
     check('buildMP4: firma ftyp', String.fromCharCode(mp4[4], mp4[5], mp4[6], mp4[7]) === 'ftyp');
     check('buildMP4: contiene stss (keyframes)', findBytes(mp4, [0x73, 0x74, 0x73, 0x73]) > 0);
     check('buildMP4: contiene stco', findBytes(mp4, [0x73, 0x74, 0x63, 0x6F]) > 0);
+  }
+
+  // ============ 6) Detección de AUDIO + extracción de bloques de video ============
+  {
+    const own = new Uint8Array(fs.readFileSync(tmp('own.webm')));
+    check('webmHasAudio: solo video → false', webmHasAudio(own) === false);
+    const ext = extractWebMVideoBlocks(own);
+    check('extract: codec y dims', ext.codecId === 'V_VP8' && ext.W === 160 && ext.H === 120);
+    check('extract: 30 bloques ordenados', ext.blocks.length === 30 && ext.blocks.every((b, i) => i === 0 || b.timestampMs >= ext.blocks[i - 1].timestampMs));
+    check('extract: primer bloque keyframe', ext.blocks[0].key === true);
+    check('extract: duración ~2s', ext.durationMs > 1900 && ext.durationMs < 2200, 'dur=' + ext.durationMs);
+    if (hasFF) {
+      // Los bloques extraídos deben re-empaquetar en un WebM decodificable idéntico en frames
+      const rewrapped = buildWebM('V_VP8', ext.W, ext.H, ext.blocks.map(b => ({ data: b.data, key: b.key, timestampMs: b.timestampMs })), ext.durationMs);
+      fs.writeFileSync(tmp('rewrap.webm'), rewrapped);
+      const cnt = (f) => parseInt(spawnSync('ffprobe', ['-v', 'error', '-select_streams', 'v', '-count_packets', '-show_entries', 'stream=nb_read_packets', '-of', 'csv=p=0', f]).stdout.toString().trim(), 10);
+      check('extract: re-empaquetado decodifica con los mismos frames', cnt(tmp('rewrap.webm')) === 30, cnt(tmp('rewrap.webm')));
+      const pipe = fs.existsSync(tmp('pipe.webm')) ? new Uint8Array(fs.readFileSync(tmp('pipe.webm'))) : null;
+      if (pipe) check('webmHasAudio: video+opus → true', webmHasAudio(pipe) === true);
+      const frag = fs.existsSync(tmp('frag.mp4')) ? new Uint8Array(fs.readFileSync(tmp('frag.mp4'))) : null;
+      if (frag) check('mp4HasAudio: video+aac → true', mp4HasAudio(frag) === true);
+      // MP4 solo-video
+      const r = ff(['-f', 'lavfi', '-i', 'testsrc=duration=1:size=160x120:rate=10', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', tmp('mudo.mp4')]);
+      if (r.status === 0) {
+        const mudo = new Uint8Array(fs.readFileSync(tmp('mudo.mp4')));
+        check('mp4HasAudio: solo video → false', mp4HasAudio(mudo) === false);
+        const qm = mp4QuickMeta(mudo);
+        check('mp4QuickMeta: dims y duración', qm.width === 160 && qm.height === 120 && qm.durationMs > 900 && qm.durationMs < 1100, JSON.stringify(qm));
+      }
+      // Metadatos binarios de WebM (plan B cuando el <video> del navegador se cuelga)
+      const wq = webmQuickMeta(own);
+      check('webmQuickMeta: dims y duración', wq.width === 160 && wq.height === 120 && wq.durationMs > 1900 && wq.durationMs < 2100, JSON.stringify(wq));
+      const roto = new Uint8Array(fs.readFileSync(tmp('broken.webm')));
+      const wq2 = webmQuickMeta(roto);
+      check('webmQuickMeta: sin Duration devuelve null', wq2.width === 160 && wq2.durationMs === null, JSON.stringify(wq2));
+    }
   }
 
   console.log(`\n${pass} passed, ${fail} failed`);

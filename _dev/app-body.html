@@ -66,6 +66,43 @@
     <button class="filter-chip" data-f="error">⛔ Con error <span class="n"></span></button>
   </div>
 
+  <!-- FILTROS AVANZADOS (facetas combinables; se suman a los chips, a la búsqueda y a ✓ Visibles) -->
+  <div id="facets">
+    <div class="facet-group">
+      <span class="facet-label">Formato</span>
+      <button class="facet-chip" data-facet="fmt" data-val="webp">WebP <span class="n"></span></button>
+      <button class="facet-chip" data-facet="fmt" data-val="gif">GIF <span class="n"></span></button>
+      <button class="facet-chip" data-facet="fmt" data-val="png">PNG <span class="n"></span></button>
+      <button class="facet-chip" data-facet="fmt" data-val="jpg">JPG <span class="n"></span></button>
+      <button class="facet-chip" data-facet="fmt" data-val="bmp">BMP <span class="n"></span></button>
+      <button class="facet-chip" data-facet="fmt" data-val="webm">WebM <span class="n"></span></button>
+      <button class="facet-chip" data-facet="fmt" data-val="mp4">MP4 <span class="n"></span></button>
+      <button class="facet-chip" data-facet="fmt" data-val="mkv">MKV <span class="n"></span></button>
+      <button class="facet-chip" data-facet="fmt" data-val="lossy" title="WebP lossy (VP8)">WebP·lossy <span class="n"></span></button>
+      <button class="facet-chip" data-facet="fmt" data-val="lossless" title="WebP lossless (VP8L)">WebP·lossless <span class="n"></span></button>
+      <button class="facet-chip" data-facet="fmt" data-val="extended" title="WebP extendido (VP8X, incluye animados)">WebP·VP8X <span class="n"></span></button>
+    </div>
+    <div class="facet-group">
+      <span class="facet-label">Duración</span>
+      <button class="facet-chip" data-facet="dur" data-val="short">≤ 10 s <span class="n"></span></button>
+      <button class="facet-chip" data-facet="dur" data-val="long">&gt; 10 s <span class="n"></span></button>
+      <button class="facet-chip" data-facet="dur" data-val="static">Sin duración <span class="n"></span></button>
+    </div>
+    <div class="facet-group">
+      <span class="facet-label">Audio</span>
+      <button class="facet-chip" data-facet="audio" data-val="con">🔊 Con audio <span class="n"></span></button>
+      <button class="facet-chip" data-facet="audio" data-val="sin">🔇 Sin audio <span class="n"></span></button>
+    </div>
+    <div class="facet-group">
+      <span class="facet-label">Estado</span>
+      <button class="facet-chip" data-facet="estado" data-val="ready">⚪ Pendiente <span class="n"></span></button>
+      <button class="facet-chip" data-facet="estado" data-val="processing">🔵 Procesando <span class="n"></span></button>
+      <button class="facet-chip" data-facet="estado" data-val="done">✅ Completado <span class="n"></span></button>
+      <button class="facet-chip" data-facet="estado" data-val="error">⛔ Error <span class="n"></span></button>
+      <button class="btn btn-sm" id="facet-clear" style="display:none">✕ Limpiar filtros</button>
+    </div>
+  </div>
+
   <!-- LISTA -->
   <div id="list"></div>
   <div id="empty-filter">No hay archivos que coincidan con este filtro o búsqueda.</div>

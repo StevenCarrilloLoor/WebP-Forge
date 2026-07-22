@@ -633,6 +633,304 @@ function remuxWebM(buffer) {
   });
 }
 
+// ---------- Detección de pista de AUDIO y extracción de video (WebM) ----------
+/** ¿El WebM/MKV tiene pista de audio? (Tracks→TrackEntry→TrackType==2). */
+function webmHasAudio(buffer) {
+  const b = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  let pos = 0;
+  let e = _ebmlReadId(b, pos);
+  if (e.id !== 0x1A45DFA3) throw new Error('No es EBML/WebM');
+  pos += e.len;
+  let s = _ebmlReadSize(b, pos);
+  pos += s.len + (s.size == null ? 0 : s.size);
+  e = _ebmlReadId(b, pos);
+  if (e.id !== 0x18538067) throw new Error('Sin Segment');
+  pos += e.len;
+  s = _ebmlReadSize(b, pos);
+  pos += s.len;
+  const segEnd = s.size == null ? b.length : Math.min(b.length, pos + s.size);
+  while (pos < segEnd) {
+    let el, sz;
+    try { el = _ebmlReadId(b, pos); sz = _ebmlReadSize(b, pos + el.len); } catch { break; }
+    const dataStart = pos + el.len + sz.len;
+    if (el.id === 0x1654AE6B && sz.size != null) { // Tracks
+      let p = dataStart;
+      const end = Math.min(dataStart + sz.size, b.length);
+      while (p < end) {
+        let ti, tsz;
+        try { ti = _ebmlReadId(b, p); tsz = _ebmlReadSize(b, p + ti.len); } catch { break; }
+        const ds = p + ti.len + tsz.len;
+        if (ti.id === 0xAE && tsz.size) {
+          let q = ds;
+          const qEnd = ds + tsz.size;
+          while (q < qEnd) {
+            let fi, fs;
+            try { fi = _ebmlReadId(b, q); fs = _ebmlReadSize(b, q + fi.len); } catch { break; }
+            const fds = q + fi.len + fs.len;
+            if (fi.id === 0x83 && fs.size && _ebmlUint(b, fds, fds + fs.size) === 2) return true;
+            q = fds + (fs.size || 0);
+          }
+        }
+        p = ds + (tsz.size || 0);
+      }
+      return false; // Tracks completo sin pista de audio
+    }
+    if (el.id === 0x1F43B675) return false; // clusters sin haber visto Tracks: asumir sin audio
+    if (sz.size == null) break;
+    pos = dataStart + sz.size;
+  }
+  return false;
+}
+/** ¿El MP4 (bytes que contengan el moov) tiene pista de audio? (trak→mdia→hdlr=='soun'). */
+function mp4HasAudio(buffer) {
+  const b = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  const top = [..._mp4Boxes(b, 0, b.length)];
+  const moov = top.find(x => x.type === 'moov');
+  if (!moov) return false;
+  for (const t of _mp4Boxes(b, moov.dataStart, moov.end)) if (t.type === 'trak')
+    for (const m of _mp4Boxes(b, t.dataStart, t.end)) if (m.type === 'mdia')
+      for (const h of _mp4Boxes(b, m.dataStart, m.end)) if (h.type === 'hdlr')
+        if (String.fromCharCode(b[h.dataStart + 8], b[h.dataStart + 9], b[h.dataStart + 10], b[h.dataStart + 11]) === 'soun') return true;
+  return false;
+}
+/** Metadatos rápidos de un WebM/MKV desde Info+Tracks (sin decodificar nada). */
+function webmQuickMeta(buffer) {
+  const b = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  let pos = 0;
+  let e = _ebmlReadId(b, pos);
+  if (e.id !== 0x1A45DFA3) throw new Error('No es EBML/WebM');
+  pos += e.len;
+  let s = _ebmlReadSize(b, pos);
+  pos += s.len + (s.size == null ? 0 : s.size);
+  e = _ebmlReadId(b, pos);
+  if (e.id !== 0x18538067) throw new Error('Sin Segment');
+  pos += e.len;
+  s = _ebmlReadSize(b, pos);
+  pos += s.len;
+  const segEnd = s.size == null ? b.length : Math.min(b.length, pos + s.size);
+  let timecodeScale = 1000000, durationTicks = null, width = 0, height = 0;
+  while (pos < segEnd) {
+    let el, sz;
+    try { el = _ebmlReadId(b, pos); sz = _ebmlReadSize(b, pos + el.len); } catch { break; }
+    const dataStart = pos + el.len + sz.len;
+    if (el.id === 0x1549A966 && sz.size != null) { // Info
+      let p = dataStart;
+      const end = dataStart + sz.size;
+      while (p < end) {
+        const ci = _ebmlReadId(b, p); const cs = _ebmlReadSize(b, p + ci.len);
+        const ds = p + ci.len + cs.len;
+        if (ci.id === 0x2AD7B1 && cs.size) timecodeScale = _ebmlUint(b, ds, ds + cs.size);
+        if (ci.id === 0x4489 && cs.size) {
+          const dv = new DataView(b.buffer, b.byteOffset + ds, cs.size);
+          durationTicks = cs.size === 4 ? dv.getFloat32(0, false) : dv.getFloat64(0, false);
+        }
+        p = ds + (cs.size || 0);
+      }
+      pos = end;
+    } else if (el.id === 0x1654AE6B && sz.size != null) { // Tracks → dims del video
+      let p = dataStart;
+      const end = dataStart + sz.size;
+      while (p < end) {
+        const ti = _ebmlReadId(b, p); const tsz = _ebmlReadSize(b, p + ti.len);
+        const ds = p + ti.len + tsz.len;
+        if (ti.id === 0xAE && tsz.size) {
+          let q = ds, type = 0, w = 0, h = 0;
+          const qEnd = ds + tsz.size;
+          while (q < qEnd) {
+            const fi = _ebmlReadId(b, q); const fs = _ebmlReadSize(b, q + fi.len);
+            const fds = q + fi.len + fs.len;
+            if (fi.id === 0x83 && fs.size) type = _ebmlUint(b, fds, fds + fs.size);
+            if (fi.id === 0xE0 && fs.size) {
+              let v2 = fds;
+              const vEnd = fds + fs.size;
+              while (v2 < vEnd) {
+                const vi = _ebmlReadId(b, v2); const vs = _ebmlReadSize(b, v2 + vi.len);
+                const vds = v2 + vi.len + vs.len;
+                if (vi.id === 0xB0 && vs.size) w = _ebmlUint(b, vds, vds + vs.size);
+                if (vi.id === 0xBA && vs.size) h = _ebmlUint(b, vds, vds + vs.size);
+                v2 = vds + (vs.size || 0);
+              }
+            }
+            q = fds + (fs.size || 0);
+          }
+          if (type === 1 && !width) { width = w; height = h; }
+        }
+        p = ds + (tsz.size || 0);
+      }
+      pos = end;
+    } else if (el.id === 0x1F43B675) break; // llegamos a los datos: suficiente
+    else {
+      if (sz.size == null) break;
+      pos = dataStart + sz.size;
+    }
+  }
+  if (!width || !height) throw new Error('WebM sin pista de video en la cabecera');
+  return { width, height, durationMs: durationTicks != null ? Math.round(durationTicks * timecodeScale / 1000000) : null };
+}
+/** Metadatos rápidos de un MP4 desde el moov (mvhd + tkhd del trak de video). */
+function mp4QuickMeta(buffer) {
+  const b = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  const top = [..._mp4Boxes(b, 0, b.length)];
+  const moov = top.find(x => x.type === 'moov');
+  if (!moov) throw new Error('MP4 sin moov en el rango leído');
+  let durationMs = null, width = 0, height = 0;
+  for (const c of _mp4Boxes(b, moov.dataStart, moov.end)) {
+    if (c.type === 'mvhd') {
+      const v = b[c.dataStart];
+      const ts = _ru32(b, c.dataStart + (v === 1 ? 20 : 12));
+      const dur = v === 1 ? _ru64(b, c.dataStart + 24) : _ru32(b, c.dataStart + 16);
+      if (ts) durationMs = Math.round(dur * 1000 / ts);
+    } else if (c.type === 'trak') {
+      let esVideo = false, w = 0, h = 0;
+      for (const t of _mp4Boxes(b, c.dataStart, c.end)) {
+        if (t.type === 'tkhd') { w = _ru32(b, t.end - 8) / 65536; h = _ru32(b, t.end - 4) / 65536; }
+        if (t.type === 'mdia') for (const m of _mp4Boxes(b, t.dataStart, t.end)) if (m.type === 'hdlr')
+          esVideo = String.fromCharCode(b[m.dataStart + 8], b[m.dataStart + 9], b[m.dataStart + 10], b[m.dataStart + 11]) === 'vide';
+      }
+      if (esVideo && !width) { width = Math.round(w); height = Math.round(h); }
+    }
+  }
+  if (!width || !height) throw new Error('MP4 sin pista de video');
+  return { width, height, durationMs };
+}
+/**
+ * Extrae los bloques de VIDEO de un WebM/MKV para transcodificar con WebCodecs
+ * (VideoDecoder). Devuelve { codecId, W, H, blocks:[{data,key,timestampMs}], durationMs }.
+ * Lanza error ante lacing (no lo usa Chrome/ffmpeg para video) o si no hay pista de video.
+ */
+function extractWebMVideoBlocks(buffer) {
+  const b = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  let pos = 0;
+  let e = _ebmlReadId(b, pos);
+  if (e.id !== 0x1A45DFA3) throw new Error('No es EBML/WebM');
+  pos += e.len;
+  let s = _ebmlReadSize(b, pos);
+  pos += s.len + (s.size == null ? 0 : s.size);
+  e = _ebmlReadId(b, pos);
+  if (e.id !== 0x18538067) throw new Error('Sin Segment');
+  pos += e.len;
+  s = _ebmlReadSize(b, pos);
+  pos += s.len;
+  const segEnd = s.size == null ? b.length : Math.min(b.length, pos + s.size);
+  let timecodeScale = 1000000, videoTrack = 0, codecId = '', W = 0, H = 0;
+  const blocks = [];
+  const msPerTick = () => timecodeScale / 1000000;
+  while (pos < segEnd) {
+    let el, sz;
+    try { el = _ebmlReadId(b, pos); sz = _ebmlReadSize(b, pos + el.len); } catch { break; }
+    const dataStart = pos + el.len + sz.len;
+    if (el.id === 0x1549A966 && sz.size != null) { // Info
+      let p = dataStart;
+      const end = dataStart + sz.size;
+      while (p < end) {
+        const ci = _ebmlReadId(b, p); const cs = _ebmlReadSize(b, p + ci.len);
+        const ds = p + ci.len + cs.len;
+        if (ci.id === 0x2AD7B1 && cs.size) timecodeScale = _ebmlUint(b, ds, ds + cs.size);
+        p = ds + (cs.size || 0);
+      }
+      pos = end;
+    } else if (el.id === 0x1654AE6B && sz.size != null) { // Tracks
+      let p = dataStart;
+      const end = dataStart + sz.size;
+      while (p < end) {
+        const ti = _ebmlReadId(b, p); const tsz = _ebmlReadSize(b, p + ti.len);
+        const ds = p + ti.len + tsz.len;
+        if (ti.id === 0xAE && tsz.size) {
+          let q = ds, num = 0, type = 0, cid = '', w = 0, h = 0;
+          const qEnd = ds + tsz.size;
+          while (q < qEnd) {
+            const fi = _ebmlReadId(b, q); const fs = _ebmlReadSize(b, q + fi.len);
+            const fds = q + fi.len + fs.len;
+            if (fi.id === 0xD7 && fs.size) num = _ebmlUint(b, fds, fds + fs.size);
+            if (fi.id === 0x83 && fs.size) type = _ebmlUint(b, fds, fds + fs.size);
+            if (fi.id === 0x86 && fs.size) cid = String.fromCharCode(...b.subarray(fds, fds + fs.size));
+            if (fi.id === 0xE0 && fs.size) { // Video → PixelWidth/PixelHeight
+              let v = fds;
+              const vEnd = fds + fs.size;
+              while (v < vEnd) {
+                const vi = _ebmlReadId(b, v); const vs = _ebmlReadSize(b, v + vi.len);
+                const vds = v + vi.len + vs.len;
+                if (vi.id === 0xB0 && vs.size) w = _ebmlUint(b, vds, vds + vs.size);
+                if (vi.id === 0xBA && vs.size) h = _ebmlUint(b, vds, vds + vs.size);
+                v = vds + (vs.size || 0);
+              }
+            }
+            q = fds + (fs.size || 0);
+          }
+          if (type === 1 && !videoTrack) { videoTrack = num; codecId = cid; W = w; H = h; }
+        }
+        p = ds + (tsz.size || 0);
+      }
+      pos = end;
+    } else if (el.id === 0x1F43B675) { // Cluster
+      let payloadEnd;
+      if (sz.size != null) payloadEnd = Math.min(segEnd, dataStart + sz.size);
+      else {
+        let p = dataStart;
+        while (p < segEnd) {
+          let ci;
+          try { ci = _ebmlReadId(b, p); } catch { break; }
+          if (_EBML_LEVEL1.has(ci.id)) break;
+          const cs = _ebmlReadSize(b, p + ci.len);
+          if (cs.size == null) break;
+          p += ci.len + cs.len + cs.size;
+        }
+        payloadEnd = p;
+      }
+      const payload = b.subarray(dataStart, payloadEnd);
+      let p = 0, tc = 0;
+      const readB = (q, blockEnd, isSimple, groupRange) => {
+        const tv = _ebmlReadSize(payload, q);
+        if (tv.size !== videoTrack) return;
+        const flags = payload[q + tv.len + 2];
+        if (flags & 0x06) throw new Error('Bloque con lacing — no soportado para transcodificación');
+        const rel = ((payload[q + tv.len] << 8) | payload[q + tv.len + 1]) << 16 >> 16;
+        let key;
+        if (isSimple) key = (flags & 0x80) !== 0;
+        else {
+          key = true;
+          let r = groupRange.start;
+          while (r < groupRange.end) {
+            let rid, rsz;
+            try { rid = _ebmlReadId(payload, r); rsz = _ebmlReadSize(payload, r + rid.len); } catch { break; }
+            if (rid.id === 0xFB) { key = false; break; }
+            r += rid.len + rsz.len + (rsz.size || 0);
+          }
+        }
+        blocks.push({ data: payload.slice(q + tv.len + 3, blockEnd), key, timestampMs: (tc + rel) * msPerTick() });
+      };
+      while (p < payload.length) {
+        let cid2, csz2;
+        try { cid2 = _ebmlReadId(payload, p); csz2 = _ebmlReadSize(payload, p + cid2.len); } catch { break; }
+        const ds2 = p + cid2.len + csz2.len;
+        const clen = csz2.size == null ? payload.length - ds2 : csz2.size;
+        if (cid2.id === 0xE7) tc = _ebmlUint(payload, ds2, ds2 + clen);
+        else if (cid2.id === 0xA3) readB(ds2, ds2 + clen, true);
+        else if (cid2.id === 0xA0) {
+          let q2 = ds2;
+          const q2End = ds2 + clen;
+          while (q2 < q2End) {
+            let gid, gsz;
+            try { gid = _ebmlReadId(payload, q2); gsz = _ebmlReadSize(payload, q2 + gid.len); } catch { break; }
+            const gds = q2 + gid.len + gsz.len;
+            if (gid.id === 0xA1) readB(gds, gds + (gsz.size || 0), false, { start: ds2, end: q2End });
+            q2 = gds + (gsz.size || 0);
+          }
+        }
+        p = ds2 + clen;
+      }
+      pos = payloadEnd;
+    } else {
+      if (sz.size == null) break;
+      pos = dataStart + sz.size;
+    }
+  }
+  if (!videoTrack || !blocks.length) throw new Error('WebM sin pista/bloques de video');
+  blocks.sort((x, y) => x.timestampMs - y.timestampMs);
+  const durationMs = blocks.length > 1 ? blocks[blocks.length - 1].timestampMs + Math.max(1, blocks[blocks.length - 1].timestampMs - blocks[blocks.length - 2].timestampMs) : 100;
+  return { codecId, W, H, blocks, durationMs };
+}
+
 // ---------- Muxer MP4 progresivo (ISO BMFF, JS puro) ----------
 // Escribe ftyp + moov (índice completo: stts/stss/stsc/stsz/stco) + mdat.
 // El moov va ANTES del mdat (faststart) y con tablas de samples correctas el
@@ -1131,5 +1429,5 @@ function buildZip(entries, onProgress) {
 
 // Export para Node (tests); en navegador quedan como globals del script
 if (typeof module !== 'undefined') {
-  module.exports = { readFourCC, parseWebP, detectContainer, parseGIF, parsePNG, parseJPEG, parseBMP, buildAnimatedWebP, extractWebPFrameChunks, listZipEntries, extractZipEntry, buildWebM, remuxWebM, buildMP4, remuxMP4, avc1SampleEntry, quantize, lzwEncode, buildGifBuffer, encodeBMP, buildZip, crc32 };
+  module.exports = { readFourCC, parseWebP, detectContainer, parseGIF, parsePNG, parseJPEG, parseBMP, buildAnimatedWebP, extractWebPFrameChunks, listZipEntries, extractZipEntry, buildWebM, remuxWebM, buildMP4, remuxMP4, avc1SampleEntry, webmHasAudio, mp4HasAudio, extractWebMVideoBlocks, webmQuickMeta, mp4QuickMeta, quantize, lzwEncode, buildGifBuffer, encodeBMP, buildZip, crc32 };
 }

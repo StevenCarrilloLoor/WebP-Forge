@@ -37,8 +37,9 @@ const check = (name, cond, extra) => {
     check('script ejecuta sin errores', false, e.stack);
     process.exit(1);
   }
-  // Stub: jsdom no decodifica video; simulamos metadatos
+  // Stub: jsdom no decodifica video; simulamos metadatos y pista de audio
   window.probeVideo = async () => ({ width: 640, height: 360, durationMs: 5000 });
+  window.hasAudioTrack = async () => false;
   const $ = (s) => window.document.querySelector(s);
   const $$ = (s) => [...window.document.querySelectorAll(s)];
 
@@ -125,6 +126,22 @@ const check = (name, cond, extra) => {
   gf.dispatchEvent(new window.Event('change', { bubbles: true }));
   check('formato global aplica', entries.filter(e => e.status !== 'invalid').every(e => e.format === 'jpg'));
 
+  // "— por archivo —" debe REVERTIR al formato por defecto de cada archivo (bug reportado)
+  gf.value = '';
+  gf.dispatchEvent(new window.Event('change', { bubbles: true }));
+  check('por archivo: revierte al formato por defecto', entries.filter(e => e.status !== 'invalid').every(e => e.format === window.defaultFormatFor(e) && e.format !== 'jpg' || e.name === 'photo.jpg'));
+  check('por archivo: los selects reflejan el cambio', entries.filter(e => e.status !== 'invalid' && e.els.fmt).every(e => e.els.fmt.value === e.format));
+
+  // Regla nueva: video ≤10 s SIN audio → GIF por defecto (forzando capacidades)
+  const CAPS = window.WEBPFORGE.CAP;
+  const oldMp4 = CAPS.mp4;
+  CAPS.mp4 = true;
+  check('regla: video ≤10s sin audio → gif', window.defaultFormatFor({ kind: 'video', info: { type: 'webm', durationMs: 5600, hasAudio: false } }) === 'gif');
+  check('regla: video ≤10s CON audio → mp4', window.defaultFormatFor({ kind: 'video', info: { type: 'webm', durationMs: 5600, hasAudio: true } }) === 'mp4');
+  check('regla: video >10s sin audio → mp4', window.defaultFormatFor({ kind: 'video', info: { type: 'webm', durationMs: 15000, hasAudio: false } }) === 'mp4');
+  CAPS.mp4 = oldMp4;
+  check('metadatos muestran 🔇 sin audio', window.document.body.textContent.includes('sin audio'));
+
   // Quitar archivo
   const before = $$('.card').length;
   window.document.querySelector('.card .card-x').click();
@@ -139,6 +156,37 @@ const check = (name, cond, extra) => {
   $('#btn-remove-sel').click();
   check('quitar selec.: solo se fue el video', window.WEBPFORGE.FILES.size === sizeBefore - 1 && ![...window.WEBPFORGE.FILES.values()].some(e => e.name === 'video.webm'));
   window.document.querySelector('[data-f=all]').click();
+
+  // ===== Filtros avanzados (facetas) =====
+  // Quedan 5 entradas: lossless.webp, animated.webp, fake.webp(inválido), photo.jpg, anim.gif
+  const clickFacet = (facet, val) => window.document.querySelector(`.facet-chip[data-facet="${facet}"][data-val="${val}"]`).click();
+  const vis = () => $$('.card').filter(c => c.style.display !== 'none').length;
+  check('panel de facetas presente', !!$('#facets') && $$('.facet-chip').length >= 18);
+  clickFacet('fmt', 'gif');
+  check('faceta formato GIF', vis() === 1);
+  clickFacet('fmt', 'gif');
+  clickFacet('dur', 'short');
+  check('faceta ≤10s (webp anim + gif anim)', vis() === 2);
+  clickFacet('dur', 'short');
+  clickFacet('estado', 'error');
+  check('faceta estado error (incluye inválidos)', vis() === 1);
+  clickFacet('estado', 'error');
+  check('sin facetas: todo visible otra vez', vis() === 5);
+  clickFacet('fmt', 'webp');
+  clickFacet('dur', 'short');
+  check('faceta combinada webp + ≤10s', vis() === 1);
+  const chipWebp = window.document.querySelector('.facet-chip[data-facet="fmt"][data-val="webp"]');
+  check('contador de faceta activo', chipWebp.querySelector('.n').textContent !== '');
+  window.document.querySelector('#facet-clear').click();
+  check('limpiar filtros restaura todo', vis() === 5);
+  check('facetas + ✓ Visibles: flujo de selección', (() => {
+    clickFacet('fmt', 'gif');
+    $('#btn-selvis').click();
+    const sel = [...window.WEBPFORGE.FILES.values()].filter(e => e.selected);
+    const ok = sel.length === 1 && sel[0].name === 'anim.gif';
+    window.document.querySelector('#facet-clear').click();
+    return ok;
+  })());
 
   // Detección directa adicional (header parcial + fullSize)
   const buf = fs.readFileSync('test-assets/animated.webp');

@@ -234,7 +234,7 @@ function probeVideo(file) {
   return new Promise((res, rej) => {
     const url = URL.createObjectURL(file);
     const v = document.createElement('video');
-    const timer = setTimeout(() => { cleanup(); rej(new Error('timeout leyendo metadatos')); }, 15000);
+    const timer = setTimeout(() => { cleanup(); rej(new Error('timeout leyendo metadatos')); }, 6000);
     const cleanup = () => { clearTimeout(timer); try { v.pause(); } catch {} URL.revokeObjectURL(url); v.removeAttribute('src'); v.load(); };
     v.preload = 'auto'; v.muted = true; v.playsInline = true;
     v.onloadedmetadata = () => {
@@ -251,11 +251,70 @@ function probeVideo(file) {
   });
 }
 
+// Plan B BINARIO de metadatos: en algunas máquinas el <video> se cuelga y no
+// entrega loadedmetadata (visto en uso real). Los metadatos salen entonces del
+// CONTENEDOR con los parsers propios — el análisis nunca depende solo del
+// pipeline de medios del navegador.
+async function probeVideoBinary(file, container) {
+  if (container === 'webm' || container === 'mkv') {
+    let meta = null;
+    try { meta = webmQuickMeta(new Uint8Array(await file.slice(0, 8 * 1048576).arrayBuffer())); } catch {}
+    if (meta && meta.durationMs != null) return meta;
+    // Sin Duration en la cabecera (típico de grabaciones): recorrer los bloques
+    const ext = extractWebMVideoBlocks(new Uint8Array(await file.arrayBuffer()));
+    return { width: ext.W, height: ext.H, durationMs: Math.round(ext.durationMs) };
+  }
+  if (container === 'mp4') {
+    let off = 0;
+    for (let hops = 0; hops < 64 && off + 16 <= file.size; hops++) {
+      const hdr = new DataView(await file.slice(off, off + 16).arrayBuffer());
+      let size = hdr.getUint32(0);
+      const typ = String.fromCharCode(hdr.getUint8(4), hdr.getUint8(5), hdr.getUint8(6), hdr.getUint8(7));
+      if (size === 1) size = Number(hdr.getBigUint64(8));
+      else if (size === 0) size = file.size - off;
+      if (size < 8) break;
+      if (typ === 'moov') return mp4QuickMeta(new Uint8Array(await file.slice(off, off + Math.min(size, 32 * 1048576)).arrayBuffer()));
+      off += size;
+    }
+  }
+  throw new Error('sin metadatos binarios');
+}
+
+// ¿Tiene el video pista de AUDIO? Se lee del CONTENEDOR (exacto, sin depender
+// de APIs de reproducción): WebM/MKV → elemento Tracks; MP4 → hdlr 'soun' del
+// moov, saltando de box en box con slices para no cargar el archivo entero.
+async function hasAudioTrack(file, container) {
+  try {
+    if (container === 'webm' || container === 'mkv') {
+      return webmHasAudio(new Uint8Array(await file.slice(0, 4 * 1048576).arrayBuffer()));
+    }
+    if (container === 'mp4') {
+      let off = 0;
+      for (let hops = 0; hops < 64 && off + 16 <= file.size; hops++) {
+        const hdr = new DataView(await file.slice(off, off + 16).arrayBuffer());
+        let size = hdr.getUint32(0);
+        const typ = String.fromCharCode(hdr.getUint8(4), hdr.getUint8(5), hdr.getUint8(6), hdr.getUint8(7));
+        if (size === 1) size = Number(hdr.getBigUint64(8));
+        else if (size === 0) size = file.size - off;
+        if (size < 8) break;
+        if (typ === 'moov') {
+          return mp4HasAudio(new Uint8Array(await file.slice(off, off + Math.min(size, 32 * 1048576)).arrayBuffer()));
+        }
+        off += size;
+      }
+    }
+  } catch {}
+  return false;
+}
+
 function defaultFormatFor(entry) {
   if (sessionPrefs.format) return sessionPrefs.format;
   const i = entry.info;
   const mp4Ok = CAP.mp4 || CAP.mp4Fast; // MediaRecorder O WebCodecs H.264
   if (entry.kind === 'video') {
+    // Video corto (≤10 s) y SIN audio: el sonido no pinta nada, así que el
+    // destino natural es GIF (comportamiento de animación).
+    if (i.durationMs <= 10000 && !i.hasAudio) return 'gif';
     // Convertir al "otro" contenedor por defecto; MP4 es lo más universal
     if (i.type !== 'mp4' && mp4Ok) return 'mp4';
     if (i.type === 'mp4' && CAP.webm) return 'webm';
@@ -358,9 +417,12 @@ async function addFiles(fileList) {
       } else if (container === 'webm' || container === 'mp4' || container === 'mkv') {
         entry.kind = 'video';
         try {
-          const m = await probeVideo(file);
+          let m;
+          try { m = await probeVideo(file); }
+          catch (e1) { m = await probeVideoBinary(file, container); } // <video> colgado → parsers propios
+          const audio = await hasAudioTrack(file, container);
           entry.info = { ...blank, valid: true, video: true, type: container, animated: true, frames: 0,
-                         width: m.width, height: m.height, durationMs: m.durationMs };
+                         width: m.width, height: m.height, durationMs: m.durationMs || 0, hasAudio: audio };
         } catch (err) {
           entry.status = 'invalid'; entry.info = { valid: false };
           entry.error = `Video ${container.toUpperCase()} detectado, pero no se puede decodificar: ${err.message}`;
@@ -383,6 +445,7 @@ async function addFiles(fileList) {
   prog.style.display = 'none';
   $('#controls').style.display = 'flex';
   $('#filters').style.display = 'flex';
+  if ($('#facets')) $('#facets').style.display = 'flex';
   refreshCounters(); applyFilter();
   toast(`<b>${accepted.length}</b> archivo(s) añadidos`);
 }
@@ -409,7 +472,7 @@ function metaFor(entry) {
   let s = `Tamaño: <b>${humanSize(entry.size)}</b>`;
   if (i && i.valid) {
     s += ` &nbsp;|&nbsp; <b>${i.width}×${i.height}</b>`;
-    if (entry.kind === 'video') s += ` &nbsp;|&nbsp; <b>${(i.durationMs/1000).toFixed(2)}s</b> de video`;
+    if (entry.kind === 'video') s += ` &nbsp;|&nbsp; <b>${(i.durationMs/1000).toFixed(2)}s</b> de video &nbsp;|&nbsp; ${i.hasAudio ? '🔊 audio' : '🔇 sin audio'}`;
     else if (i.animated) s += ` &nbsp;|&nbsp; <b>${i.frames}</b> frames · ${(i.durationMs/1000).toFixed(2)}s · loop ${i.loopCount === 0 ? '∞' : i.loopCount}`;
     const extra = [i.hasAlpha && 'alpha', i.hasICC && 'ICC', i.hasEXIF && 'EXIF', i.hasXMP && 'XMP'].filter(Boolean);
     if (extra.length) s += ` &nbsp;|&nbsp; ${extra.join(' · ')}`;
@@ -539,7 +602,11 @@ function removeEntry(entry) {
   entry.els.card.remove();
   FILES.delete(entry.id);
   refreshCounters();
-  if (!FILES.size) { $('#controls').style.display = 'none'; $('#filters').style.display = 'none'; }
+  if (!FILES.size) {
+    $('#controls').style.display = 'none';
+    $('#filters').style.display = 'none';
+    if ($('#facets')) $('#facets').style.display = 'none';
+  }
 }
 
 // ---------- Decodificación WebP ----------
@@ -579,6 +646,46 @@ async function decodeAllFrames(entry, onProg, firstOnly) {
   return [{ bmp, delayMs: 100 }];
 }
 
+// Bitrate razonable según resolución y fps. Antes eran 16 Mbps FIJOS y un
+// WebM de 2 MB salía como video de 5-7 MB (+163%/+227% reportado en uso real).
+function videoBitrateFor(w, h, fps) {
+  return Math.max(1_200_000, Math.min(16_000_000, Math.round(w * h * Math.min(fps || 30, 60) * 0.09)));
+}
+// Elige el primer códec H.264 soportado. Devuelve { codec, hw } o null.
+async function pickH264(W, H) {
+  for (const c of ['avc1.640033', 'avc1.4D0033', 'avc1.42E01E', 'avc1.42001E']) {
+    try {
+      const hw = await VideoEncoder.isConfigSupported({ codec: c, width: W, height: H, avc: { format: 'avc' }, hardwareAcceleration: 'prefer-hardware' });
+      if (hw.supported) return { codec: c, hw: true };
+    } catch {}
+    try {
+      const sup = await VideoEncoder.isConfigSupported({ codec: c, width: W, height: H, avc: { format: 'avc' } });
+      if (sup.supported) return { codec: c, hw: false };
+    } catch {}
+  }
+  return null;
+}
+// Ejecuta un intento de codificación con reintento HW → SOFTWARE: los
+// encoders por hardware pueden fallar A MITAD (p. ej. NVENC rechaza
+// resoluciones pequeñas) y eso solo se ve al codificar, no en isConfigSupported.
+async function conReintentoHW(usaHw, intento) {
+  let ultimo = null;
+  for (const hw of usaHw ? [true, false] : [false]) {
+    try { return await intento(hw); }
+    catch (e) {
+      ultimo = e;
+      console.warn(`Encoder ${hw ? 'por hardware' : 'por software'} falló:`, (e && e.name ? e.name + ': ' + e.message : e));
+    }
+  }
+  throw ultimo || new Error('Sin encoder disponible');
+}
+// flush protegido: si el codec ya se cerró por un error interno, reporta el
+// ERROR ORIGINAL en vez del InvalidStateError del flush (que lo enmascaraba).
+async function flushCodec(codec, getErr) {
+  if (getErr()) throw getErr();
+  try { await codec.flush(); } catch (e) { throw getErr() || e; }
+  if (getErr()) throw getErr();
+}
 function makeCanvas(w, h) {
   if (CAP.offscreen) return new OffscreenCanvas(w, h);
   const c = document.createElement('canvas'); c.width = w; c.height = h; return c;
@@ -678,12 +785,13 @@ async function videoToVideo(entry, wantMp4, onProg) {
     const hasAudio = stream.getAudioTracks().length > 0;
     let mime = useMp4 ? (hasAudio && CAP.mp4AudioMime ? CAP.mp4AudioMime : CAP.mp4Mime)
                       : (hasAudio && CAP.webmAudioMime ? CAP.webmAudioMime : CAP.webmMime);
+    const vbr = videoBitrateFor(v.videoWidth || 1280, v.videoHeight || 720, 30);
     let rec;
-    try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 16_000_000 }); }
+    try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: vbr }); }
     catch { // códec de audio no soportado → quitar audio y reintentar solo con video
       stream.getAudioTracks().forEach(t => stream.removeTrack(t));
       mime = useMp4 ? CAP.mp4Mime : CAP.webmMime;
-      rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 16_000_000 });
+      rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: vbr });
     }
     const chunks = [];
     rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
@@ -783,7 +891,8 @@ async function framesToVideo(frames, w, h, wantMp4, onProg) {
   const canReq = track && typeof track.requestFrame === 'function';
   if (!canReq) { stream = canvas.captureStream(30); track = stream.getVideoTracks()[0]; }
 
-  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 16_000_000 });
+  const fpsEst = 1000 / Math.max(20, frames.reduce((a, f) => a + Math.max(f.delayMs, 33), 0) / frames.length);
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: videoBitrateFor(W, H, fpsEst) });
   const chunks = [];
   rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
   const stopped = new Promise(r => { rec.onstop = r; });
@@ -860,36 +969,40 @@ async function framesToWebMFast(frames, w, h, onProg) {
     } catch {}
   }
   if (!codec) throw new Error('VideoEncoder sin soporte VP8/VP9');
-  const blocks = [];
-  let encError = null;
-  const enc = new VideoEncoder({
-    output: (chunk) => {
-      const d = new Uint8Array(chunk.byteLength);
-      chunk.copyTo(d);
-      blocks.push({ data: d, key: chunk.type === 'key', timestampMs: chunk.timestamp / 1000 });
-    },
-    error: (e) => { encError = e; }
+  const fpsEst = 1000 / Math.max(20, frames.reduce((a, f) => a + Math.max(f.delayMs, 10), 0) / frames.length);
+  return conReintentoHW(!!hwConfig, async (usarHw) => {
+    const blocks = [];
+    let encError = null;
+    const enc = new VideoEncoder({
+      output: (chunk) => {
+        const d = new Uint8Array(chunk.byteLength);
+        chunk.copyTo(d);
+        blocks.push({ data: d, key: chunk.type === 'key', timestampMs: chunk.timestamp / 1000 });
+      },
+      error: (e) => { encError = e; }
+    });
+    try {
+      const cfg = { codec, width: W, height: H, bitrate: videoBitrateFor(W, H, fpsEst) };
+      if (usarHw) cfg.hardwareAcceleration = 'prefer-hardware';
+      enc.configure(cfg);
+      const c = makeCanvas(W, H);
+      const ctx = c.getContext('2d');
+      let ts = 0;
+      for (let i = 0; i < frames.length; i++) {
+        if (encError) throw encError;
+        ctx.drawImage(frames[i].bmp, 0, 0, W, H);
+        const vf = new VideoFrame(c, { timestamp: ts * 1000, duration: Math.max(frames[i].delayMs, 10) * 1000 });
+        enc.encode(vf, { keyFrame: i % 60 === 0 });
+        vf.close();
+        ts += Math.max(frames[i].delayMs, 10);
+        onProg && onProg(`Codificando ⚡WebCodecs ${i + 1}/${frames.length}`, 40 + (i + 1) / frames.length * 50);
+        if (i % 10 === 9) await raf();
+      }
+      await flushCodec(enc, () => encError);
+      if (!blocks.length) throw new Error('VideoEncoder no produjo chunks');
+      return new Blob([buildWebM(codecId, W, H, blocks, ts)], { type: 'video/webm' });
+    } finally { try { enc.close(); } catch {} }
   });
-  const cfg = { codec, width: W, height: H, bitrate: 16_000_000 };
-  if (hwConfig) cfg.hardwareAcceleration = hwConfig;
-  enc.configure(cfg);
-  const c = makeCanvas(W, H);
-  const ctx = c.getContext('2d');
-  let ts = 0;
-  for (let i = 0; i < frames.length; i++) {
-    ctx.drawImage(frames[i].bmp, 0, 0, W, H);
-    const vf = new VideoFrame(c, { timestamp: ts * 1000, duration: Math.max(frames[i].delayMs, 10) * 1000 });
-    enc.encode(vf, { keyFrame: i % 60 === 0 });
-    vf.close();
-    ts += Math.max(frames[i].delayMs, 10);
-    onProg && onProg(`Codificando ⚡WebCodecs ${i + 1}/${frames.length}`, 40 + (i + 1) / frames.length * 50);
-    if (i % 10 === 9) await raf();
-  }
-  await enc.flush();
-  enc.close();
-  if (encError) throw encError;
-  if (!blocks.length) throw new Error('VideoEncoder no produjo chunks');
-  return new Blob([buildWebM(codecId, W, H, blocks, ts)], { type: 'video/webm' });
 }
 
 // ---------- MP4 acelerado: WebCodecs H.264 + muxer ISO BMFF propio ----------
@@ -899,73 +1012,255 @@ async function framesToWebMFast(frames, w, h, onProg) {
 // camino clásico (que a su vez degrada a WebM con aviso).
 async function framesToMP4Fast(frames, w, h, onProg) {
   const W = Math.max(2, w & ~1), H = Math.max(2, h & ~1);
-  let codec = null, hwConfig = null;
-  for (const c of ['avc1.640033', 'avc1.4D0033', 'avc1.42E01E', 'avc1.42001E']) { // High/Main L5.1 → Baseline
-    try {
-      const hw = await VideoEncoder.isConfigSupported({ codec: c, width: W, height: H, avc: { format: 'avc' }, hardwareAcceleration: 'prefer-hardware' });
-      if (hw.supported) { codec = c; hwConfig = 'prefer-hardware'; break; }
-    } catch {}
-    try {
-      const sup = await VideoEncoder.isConfigSupported({ codec: c, width: W, height: H, avc: { format: 'avc' } });
-      if (sup.supported) { codec = c; hwConfig = null; break; }
-    } catch {}
-  }
-  if (!codec) throw new Error('VideoEncoder sin soporte H.264 en este entorno');
-  let description = null, encError = null;
-  const samples = [];
-  const enc = new VideoEncoder({
-    output: (chunk, meta) => {
-      if (!description && meta && meta.decoderConfig && meta.decoderConfig.description) {
-        description = new Uint8Array(meta.decoderConfig.description instanceof ArrayBuffer ? meta.decoderConfig.description : meta.decoderConfig.description.buffer);
-      }
-      const d = new Uint8Array(chunk.byteLength);
-      chunk.copyTo(d);
-      samples.push({ data: d, key: chunk.type === 'key', durUs: chunk.duration || 0 });
-    },
-    error: (e) => { encError = e; }
-  });
-  const cfg = { codec, width: W, height: H, bitrate: 16_000_000, avc: { format: 'avc' } };
-  if (hwConfig) cfg.hardwareAcceleration = hwConfig;
-  enc.configure(cfg);
-  const c = makeCanvas(W, H);
-  const ctx = c.getContext('2d');
+  const sel = await pickH264(W, H);
+  if (!sel) throw new Error('VideoEncoder sin soporte H.264 en este entorno');
   const delayOf = (i) => frames.length === 1 ? 3000 : Math.max(frames[i].delayMs, 10);
-  let ts = 0;
-  for (let i = 0; i < frames.length; i++) {
-    ctx.drawImage(frames[i].bmp, 0, 0, W, H);
-    const vf = new VideoFrame(c, { timestamp: ts * 1000, duration: delayOf(i) * 1000 });
-    enc.encode(vf, { keyFrame: i % 60 === 0 });
-    vf.close();
-    ts += delayOf(i);
-    onProg && onProg(`Codificando ⚡H.264 ${i + 1}/${frames.length}`, 40 + (i + 1) / frames.length * 50);
-    if (i % 10 === 9) await raf();
+  const fpsEst = frames.length === 1 ? 1 : 1000 / Math.max(20, frames.reduce((a, f) => a + Math.max(f.delayMs, 10), 0) / frames.length);
+  return conReintentoHW(sel.hw, async (usarHw) => {
+    let description = null, encError = null;
+    const samples = [];
+    const enc = new VideoEncoder({
+      output: (chunk, meta) => {
+        if (!description && meta && meta.decoderConfig && meta.decoderConfig.description) {
+          description = new Uint8Array(meta.decoderConfig.description instanceof ArrayBuffer ? meta.decoderConfig.description : meta.decoderConfig.description.buffer);
+        }
+        const d = new Uint8Array(chunk.byteLength);
+        chunk.copyTo(d);
+        samples.push({ data: d, key: chunk.type === 'key' });
+      },
+      error: (e) => { encError = e; }
+    });
+    try {
+      const cfg = { codec: sel.codec, width: W, height: H, bitrate: videoBitrateFor(W, H, fpsEst), avc: { format: 'avc' } };
+      if (usarHw) cfg.hardwareAcceleration = 'prefer-hardware';
+      enc.configure(cfg);
+      const c = makeCanvas(W, H);
+      const ctx = c.getContext('2d');
+      let ts = 0;
+      for (let i = 0; i < frames.length; i++) {
+        if (encError) throw encError;
+        ctx.drawImage(frames[i].bmp, 0, 0, W, H);
+        const vf = new VideoFrame(c, { timestamp: ts * 1000, duration: delayOf(i) * 1000 });
+        enc.encode(vf, { keyFrame: i % 60 === 0 });
+        vf.close();
+        ts += delayOf(i);
+        onProg && onProg(`Codificando ⚡H.264 ${i + 1}/${frames.length}`, 40 + (i + 1) / frames.length * 50);
+        if (i % 10 === 9) await raf();
+      }
+      await flushCodec(enc, () => encError);
+      if (!samples.length) throw new Error('VideoEncoder no produjo muestras');
+      if (!description) throw new Error('El encoder no entregó avcC (description)');
+      const TS = 90000; // timescale estándar de video
+      let i = 0;
+      const mp4 = buildMP4([{
+        kind: 'video', timescale: TS, W, H,
+        sampleEntry: avc1SampleEntry(W, H, description),
+        samples: samples.map(s => ({ data: s.data, key: s.key, dur: Math.max(1, Math.round(delayOf(i++) * TS / 1000)) })),
+      }]);
+      return new Blob([mp4], { type: 'video/mp4' });
+    } finally { try { enc.close(); } catch {} }
+  });
+}
+
+// ---------- Video → MP4 acelerado (demux propio + VideoDecoder + H.264) ----------
+// Para videos SIN audio: demuxea el WebM/MKV con el parser EBML propio,
+// decodifica con VideoDecoder y re-codifica H.264 al muxer MP4 propio. Más
+// rápido que tiempo real y la ÚNICA vía de MP4 real donde MediaRecorder no
+// graba MP4 (app de escritorio).
+async function videoToMP4Fast(entry, onProg) {
+  if (typeof VideoDecoder === 'undefined') throw new Error('VideoDecoder no disponible');
+  onProg('Leyendo y demuxeando el video…', 3);
+  const buf = new Uint8Array(await entry.file.arrayBuffer());
+  const src = extractWebMVideoBlocks(buf);
+  const DEC = { V_VP8: ['vp8'], V_VP9: ['vp09.00.10.08', 'vp09.00.31.08', 'vp09.00.51.08'], V_AV1: ['av01.0.08M.08', 'av01.0.04M.08'] };
+  const candidatos = DEC[src.codecId];
+  if (!candidatos) throw new Error('Códec de origen no soportado para transcodificar: ' + src.codecId);
+  let dcodec = null;
+  for (const c of candidatos) {
+    try {
+      const s = await VideoDecoder.isConfigSupported({ codec: c, codedWidth: src.W, codedHeight: src.H });
+      if (s && s.supported) { dcodec = c; break; }
+    } catch {}
   }
-  await enc.flush();
-  enc.close();
-  if (encError) throw encError;
-  if (!samples.length) throw new Error('VideoEncoder no produjo muestras');
-  if (!description) throw new Error('El encoder no entregó avcC (description)');
-  const TS = 90000; // timescale estándar de video
-  let i = 0;
-  const mp4 = buildMP4([{
-    kind: 'video', timescale: TS, W, H,
-    sampleEntry: avc1SampleEntry(W, H, description),
-    samples: samples.map(s => ({ data: s.data, key: s.key, dur: Math.max(1, Math.round(delayOf(i++) * TS / 1000)) })),
-  }]);
-  return new Blob([mp4], { type: 'video/mp4' });
+  if (!dcodec) throw new Error('VideoDecoder no soporta ' + src.codecId + ' en este entorno');
+  const W = Math.max(2, src.W & ~1), H = Math.max(2, src.H & ~1);
+  const fps = src.blocks.length / Math.max(src.durationMs / 1000, 0.1);
+  const sel = await pickH264(W, H);
+  if (!sel) throw new Error('VideoEncoder sin soporte H.264');
+  return conReintentoHW(sel.hw, async (usarHw) => {
+    let description = null, encError = null, decError = null;
+    const samples = [];
+    const enc = new VideoEncoder({
+      output: (chunk, meta) => {
+        if (!description && meta && meta.decoderConfig && meta.decoderConfig.description) {
+          const d = meta.decoderConfig.description;
+          description = new Uint8Array(d instanceof ArrayBuffer ? d : d.buffer);
+        }
+        const dd = new Uint8Array(chunk.byteLength);
+        chunk.copyTo(dd);
+        samples.push({ data: dd, key: chunk.type === 'key', tsUs: chunk.timestamp });
+      },
+      error: (e) => { encError = e; },
+    });
+    const keyQ = src.blocks.map(b => b.key);
+    let iOut = 0;
+    // Los frames decodificados llegan en formatos YUV que algunos encoders
+    // H.264 rechazan ("Unexpected frame format", visto en la app de
+    // escritorio): se normalizan pasando por canvas (RGBA), igual que en la
+    // vía de frames que sí funciona en todos lados.
+    const cnv = makeCanvas(W, H);
+    const cctx = cnv.getContext('2d');
+    const dec = new VideoDecoder({
+      output: (frame) => {
+        try {
+          if (!encError) {
+            cctx.drawImage(frame, 0, 0, W, H);
+            const vf = new VideoFrame(cnv, { timestamp: frame.timestamp, duration: frame.duration || undefined });
+            enc.encode(vf, { keyFrame: !!keyQ[iOut] || iOut % 120 === 0 });
+            vf.close();
+          }
+          iOut++;
+        } catch (e) { encError = e; }
+        finally { frame.close(); }
+      },
+      error: (e) => { decError = e; },
+    });
+    try {
+      const cfg = { codec: sel.codec, width: W, height: H, bitrate: videoBitrateFor(W, H, fps), avc: { format: 'avc' } };
+      if (usarHw) cfg.hardwareAcceleration = 'prefer-hardware';
+      enc.configure(cfg);
+      dec.configure({ codec: dcodec, codedWidth: src.W, codedHeight: src.H });
+      for (let i = 0; i < src.blocks.length; i++) {
+        const blk = src.blocks[i];
+        dec.decode(new EncodedVideoChunk({ type: blk.key ? 'key' : 'delta', timestamp: Math.round(blk.timestampMs * 1000), data: blk.data }));
+        if (dec.decodeQueueSize > 8) await new Promise(r => dec.addEventListener('dequeue', r, { once: true }));
+        if (decError) throw decError;
+        if (encError) throw encError;
+        onProg(`Transcodificando ⚡ ${i + 1}/${src.blocks.length}`, 5 + (i + 1) / src.blocks.length * 82);
+        if (i % 20 === 19) await raf();
+      }
+      await flushCodec(dec, () => decError);
+      await flushCodec(enc, () => encError || decError);
+      if (!samples.length) throw new Error('La transcodificación no produjo muestras');
+      if (!description) throw new Error('El encoder no entregó avcC');
+      onProg('Muxeando MP4…', 92);
+      const TS = 90000;
+      samples.sort((a, b) => a.tsUs - b.tsUs);
+      const durs = samples.map((s, i) => {
+        const next = samples[i + 1];
+        const prev = samples[i - 1];
+        const us = next ? next.tsUs - s.tsUs : (prev ? s.tsUs - prev.tsUs : 100000);
+        return Math.max(1, Math.round(us * TS / 1e6));
+      });
+      const mp4 = buildMP4([{
+        kind: 'video', timescale: TS, W, H,
+        sampleEntry: avc1SampleEntry(W, H, description),
+        samples: samples.map((s, i) => ({ data: s.data, key: s.key, dur: durs[i] })),
+      }]);
+      return new Blob([mp4], { type: 'video/mp4' });
+    } finally {
+      try { dec.close(); } catch {}
+      try { enc.close(); } catch {}
+    }
+  });
+}
+
+// ---------- Video → MP4 por CAPTURA (tiempo real, rVFC + H.264) ----------
+// Plan B cuando el VideoDecoder no soporta el códec de origen (visto en la
+// app de escritorio con VP9): se reproduce el <video> y cada frame presentado
+// se codifica a H.264 con requestVideoFrameCallback. Tiempo real, pero MP4
+// REAL con el muxer propio. Solo para fuentes sin audio.
+async function videoToMP4Capture(entry, onProg) {
+  if (typeof HTMLVideoElement === 'undefined' || !HTMLVideoElement.prototype.requestVideoFrameCallback) throw new Error('requestVideoFrameCallback no disponible');
+  const { v, url } = await videoElement(entry);
+  try {
+    const W = Math.max(2, v.videoWidth & ~1), H = Math.max(2, v.videoHeight & ~1);
+    const sel = await pickH264(W, H);
+    if (!sel) throw new Error('VideoEncoder sin soporte H.264');
+    return await conReintentoHW(sel.hw, async (usarHw) => {
+      v.pause();
+      v.currentTime = 0; // cada intento reproduce desde el inicio
+      let description = null, encError = null, nFrames = 0;
+      const samples = [];
+      const enc = new VideoEncoder({
+        output: (chunk, meta) => {
+          if (!description && meta && meta.decoderConfig && meta.decoderConfig.description) {
+            const d = meta.decoderConfig.description;
+            description = new Uint8Array(d instanceof ArrayBuffer ? d : d.buffer);
+          }
+          const dd = new Uint8Array(chunk.byteLength);
+          chunk.copyTo(dd);
+          samples.push({ data: dd, key: chunk.type === 'key', tsUs: chunk.timestamp });
+        },
+        error: (e) => { encError = e; },
+      });
+      try {
+        const cfg = { codec: sel.codec, width: W, height: H, bitrate: videoBitrateFor(W, H, 30), avc: { format: 'avc' } };
+        if (usarHw) cfg.hardwareAcceleration = 'prefer-hardware';
+        enc.configure(cfg);
+        let done = false;
+        // Igual que en la transcodificación: normalizar cada frame vía canvas
+        // (RGBA) para que cualquier encoder H.264 lo acepte.
+        const cnv = makeCanvas(W, H);
+        const cctx = cnv.getContext('2d');
+        const onFrame = (_now, meta) => {
+          if (done || encError) return;
+          try {
+            cctx.drawImage(v, 0, 0, W, H);
+            const vf = new VideoFrame(cnv, { timestamp: Math.round((meta.mediaTime || v.currentTime) * 1e6) });
+            enc.encode(vf, { keyFrame: nFrames % 60 === 0 });
+            vf.close();
+            nFrames++;
+            onProg(`Capturando y codificando H.264 — ${v.currentTime.toFixed(1)}s / ${(v.duration || 0).toFixed(1)}s (tiempo real)`, 5 + (v.currentTime / (v.duration || 1)) * 85);
+          } catch (e) { encError = e; }
+          v.requestVideoFrameCallback(onFrame);
+        };
+        v.requestVideoFrameCallback(onFrame);
+        await v.play();
+        await new Promise((res, rej) => { v.onended = res; v.onerror = () => rej(new Error('error reproduciendo el video')); });
+        done = true;
+        await flushCodec(enc, () => encError);
+        if (samples.length < 1) throw new Error('La captura no produjo frames');
+        if (!description) throw new Error('El encoder no entregó avcC');
+        const TS = 90000;
+        samples.sort((a, b) => a.tsUs - b.tsUs);
+        const durs = samples.map((s, i) => {
+          const next = samples[i + 1];
+          const prev = samples[i - 1];
+          const us = next ? next.tsUs - s.tsUs : (prev ? s.tsUs - prev.tsUs : 33333);
+          return Math.max(1, Math.round(us * TS / 1e6));
+        });
+        const mp4 = buildMP4([{
+          kind: 'video', timescale: TS, W, H,
+          sampleEntry: avc1SampleEntry(W, H, description),
+          samples: samples.map((s, i) => ({ data: s.data, key: s.key, dur: durs[i] })),
+        }]);
+        return new Blob([mp4], { type: 'video/mp4' });
+      } finally { try { enc.close(); } catch {} }
+    });
+  } finally { URL.revokeObjectURL(url); }
 }
 
 // Comprueba que un blob de video es decodificable Y buscable antes de darlo
-// por bueno (dimensiones válidas + duración finita, sin la cual no hay seek)
-function validateVideoBlob(blob) {
-  return new Promise((res) => {
+// por bueno (dimensiones válidas + duración finita, sin la cual no hay seek).
+// Si el <video> del navegador está COLGADO (timeout, visto en uso real), se
+// valida ESTRUCTURALMENTE con los parsers propios en vez de rechazar en falso.
+async function validateVideoBlob(blob, ext) {
+  const porVideo = await new Promise((res) => {
     const url = URL.createObjectURL(blob);
     const v = document.createElement('video');
-    const t = setTimeout(() => { URL.revokeObjectURL(url); res(false); }, 8000);
-    v.onloadedmetadata = () => { clearTimeout(t); URL.revokeObjectURL(url); res(v.videoWidth > 0 && isFinite(v.duration) && v.duration > 0); };
-    v.onerror = () => { clearTimeout(t); URL.revokeObjectURL(url); res(false); };
+    const t = setTimeout(() => { URL.revokeObjectURL(url); res('timeout'); }, 8000);
+    v.onloadedmetadata = () => { clearTimeout(t); URL.revokeObjectURL(url); res(v.videoWidth > 0 && isFinite(v.duration) && v.duration > 0 ? 'ok' : 'bad'); };
+    v.onerror = () => { clearTimeout(t); URL.revokeObjectURL(url); res('bad'); };
     v.src = url;
   });
+  if (porVideo !== 'timeout') return porVideo === 'ok';
+  try {
+    const b = new Uint8Array(await blob.arrayBuffer());
+    if (ext === 'mp4') return remuxMP4(b) === null; // progresivo, parseable y con moov
+    if (ext === 'webm') { remuxWebM(b); return true; } // parseable de punta a punta
+  } catch { return false; }
+  return false;
 }
 
 // ---------- Pipeline de conversión ----------
@@ -997,10 +1292,42 @@ async function convertEntry(entry) {
     if (entry.kind === 'video') {
       // ===== Entrada de VIDEO (WebM/MP4) =====
       if (fmt === 'mp4' || fmt === 'webm') {
-        setProgress(entry, `Re-codificando video (~${(entry.info.durationMs/1000).toFixed(1)}s, tiempo real)…`, 4);
-        const r = await videoToVideo(entry, fmt === 'mp4', (t, p) => setProgress(entry, t, p));
+        let r = null;
+        // ⚡ MP4 sin audio desde WebM/MKV: transcodificación WebCodecs con demux
+        // propio — más rápida que tiempo real y única vía de MP4 real cuando
+        // MediaRecorder no lo graba (app de escritorio).
+        if (fmt === 'mp4' && SETTINGS.gpu && CAP.webcodecs && CAP.mp4Fast && !entry.info.hasAudio) {
+          // Nivel 1: transcodificación (demux propio + VideoDecoder), más rápida que tiempo real
+          if (entry.info.type === 'webm' || entry.info.type === 'mkv') {
+            try {
+              const fast = await videoToMP4Fast(entry, (t, p) => setProgress(entry, t, p));
+              setProgress(entry, 'Validando MP4 generado…', 95);
+              if (await validateVideoBlob(fast, 'mp4')) {
+                r = { blob: fast, ext: 'mp4', fellBack: false };
+                entry.fallbackNote = 'transcodificado con WebCodecs (H.264 acelerado, más rápido que tiempo real)';
+              }
+            } catch (e) { console.warn('Transcodificación WebCodecs falló; pruebo captura rVFC:', (e && (e.name + ': ' + e.message)) || e); }
+          }
+          // Nivel 2: captura rVFC en tiempo real → MP4 real igualmente
+          if (!r) {
+            try {
+              const cap = await videoToMP4Capture(entry, (t, p) => setProgress(entry, t, p));
+              setProgress(entry, 'Validando MP4 generado…', 95);
+              if (await validateVideoBlob(cap, 'mp4')) {
+                r = { blob: cap, ext: 'mp4', fellBack: false };
+                entry.fallbackNote = 'MP4 codificado con WebCodecs H.264 (captura en tiempo real)';
+              }
+            } catch (e) { console.warn('Captura rVFC falló; fallback clásico:', (e && (e.name + ': ' + e.message)) || e); }
+          }
+        }
+        if (!r) {
+          setProgress(entry, `Re-codificando video (~${(entry.info.durationMs/1000).toFixed(1)}s, tiempo real)…`, 4);
+          r = await videoToVideo(entry, fmt === 'mp4', (t, p) => setProgress(entry, t, p));
+        }
         blob = r.blob; ext = r.ext;
-        if (r.fellBack) entry.fallbackNote = 'Este navegador no graba MP4: se generó WebM.';
+        if (r.fellBack) entry.fallbackNote = (entry.info.hasAudio && CAP.mp4Fast)
+          ? 'Se generó WebM para CONSERVAR el audio (aquí el MP4 solo es posible sin pista de audio).'
+          : 'Este navegador no graba MP4: se generó WebM.';
       } else if (fmt === 'gif') {
         const r = await videoFrames(entry, (t, p) => setProgress(entry, t, p));
         setProgress(entry, 'Cuantizando y codificando GIF (LZW)…', 52);
@@ -1089,7 +1416,7 @@ async function convertEntry(entry) {
               ? await framesToWebMFast(frames, W, H, (t, p) => setProgress(entry, t, p))
               : await framesToMP4Fast(frames, W, H, (t, p) => setProgress(entry, t, p));
             setProgress(entry, `Validando ${fmt.toUpperCase()} generado…`, 95);
-            if (await validateVideoBlob(fast)) {
+            if (await validateVideoBlob(fast, fmt)) {
               r = { blob: fast, ext: fmt, fellBack: false };
               entry.fallbackNote = 'codificado con WebCodecs (acelerado, más rápido que tiempo real)';
             }
@@ -1262,10 +1589,38 @@ function entryMatchesFilter(e, f) {
     case 'error': return e.status === 'error' || e.status === 'invalid';
   }
 }
+// ---------- Filtros avanzados (facetas combinables) ----------
+// AND entre grupos, OR dentro de "Formato". Se combinan con los chips
+// principales y la búsqueda. Con "✓ Visibles" permiten selecciones del tipo
+// "todos los WebM de menos de 10 s sin audio".
+const FACETS = { fmt: new Set(), dur: 'all', audio: 'all', estado: 'all' };
+function entryMatchesFacets(e, except) {
+  const i = e.info || {};
+  // 'webp' agrupa los subtipos reales (lossy/lossless/extended)
+  const fmtDe = (x) => x.kind === 'webp' ? ['webp', (x.info || {}).type] : [(x.info || {}).type];
+  if (except !== 'fmt' && FACETS.fmt.size && !fmtDe(e).some(t => FACETS.fmt.has(t))) return false;
+  if (except !== 'dur' && FACETS.dur !== 'all') {
+    const d = i.durationMs || 0;
+    if (FACETS.dur === 'short' && !(d > 0 && d <= 10000)) return false;
+    if (FACETS.dur === 'long' && d <= 10000) return false;
+    if (FACETS.dur === 'static' && d > 0) return false;
+  }
+  if (except !== 'audio' && FACETS.audio !== 'all') {
+    if (FACETS.audio === 'con' && !i.hasAudio) return false;
+    if (FACETS.audio === 'sin' && i.hasAudio) return false;
+  }
+  if (except !== 'estado' && FACETS.estado !== 'all') {
+    const st = e.status === 'invalid' ? 'error' : e.status;
+    if (FACETS.estado !== st) return false;
+  }
+  return true;
+}
+function facetsActive() { return FACETS.fmt.size > 0 || FACETS.dur !== 'all' || FACETS.audio !== 'all' || FACETS.estado !== 'all'; }
 function applyFilter() {
   let visible = 0;
+  const base = (e) => entryMatchesFilter(e, activeFilter) && (!searchTerm || e.name.toLowerCase().includes(searchTerm));
   for (const e of FILES.values()) {
-    const show = entryMatchesFilter(e, activeFilter) && (!searchTerm || e.name.toLowerCase().includes(searchTerm));
+    const show = base(e) && entryMatchesFacets(e);
     e.els.card.style.display = show ? '' : 'none';
     if (show) visible++;
   }
@@ -1274,7 +1629,50 @@ function applyFilter() {
     const n = [...FILES.values()].filter(e => entryMatchesFilter(e, chip.dataset.f)).length;
     $('.n', chip).textContent = n ? `(${n})` : '';
   }
+  // Contadores de facetas: cada chip cuenta lo que quedaría al activarlo
+  // (respetando el resto de filtros, patrón facetado estándar)
+  for (const chip of $$('.facet-chip')) {
+    const { facet, val } = chip.dataset;
+    const matchesThis = (e) => {
+      const i = e.info || {};
+      if (facet === 'fmt') return val === 'webp' ? e.kind === 'webp' : i.type === val;
+      if (facet === 'dur') {
+        const d = i.durationMs || 0;
+        return val === 'short' ? (d > 0 && d <= 10000) : val === 'long' ? d > 10000 : d === 0;
+      }
+      if (facet === 'audio') return val === 'con' ? !!i.hasAudio : !i.hasAudio;
+      if (facet === 'estado') return (e.status === 'invalid' ? 'error' : e.status) === val;
+      return false;
+    };
+    const n = [...FILES.values()].filter(e => base(e) && entryMatchesFacets(e, facet) && matchesThis(e)).length;
+    const el = $('.n', chip);
+    if (el) el.textContent = n ? `(${n})` : '';
+  }
+  const clearBtn = $('#facet-clear');
+  if (clearBtn) clearBtn.style.display = (facetsActive() || searchTerm) ? '' : 'none';
 }
+$('#facets') && $('#facets').addEventListener('click', (e) => {
+  const chip = e.target.closest('.facet-chip');
+  if (!chip) return;
+  const { facet, val } = chip.dataset;
+  if (facet === 'fmt') {
+    if (FACETS.fmt.has(val)) { FACETS.fmt.delete(val); chip.classList.remove('active'); }
+    else { FACETS.fmt.add(val); chip.classList.add('active'); }
+  } else {
+    const yaActivo = FACETS[facet] === val;
+    FACETS[facet] = yaActivo ? 'all' : val;
+    $$(`.facet-chip[data-facet="${facet}"]`).forEach(c => c.classList.toggle('active', !yaActivo && c.dataset.val === val));
+  }
+  applyFilter();
+});
+$('#facet-clear') && $('#facet-clear').addEventListener('click', () => {
+  FACETS.fmt.clear(); FACETS.dur = 'all'; FACETS.audio = 'all'; FACETS.estado = 'all';
+  $$('.facet-chip').forEach(c => c.classList.remove('active'));
+  searchTerm = '';
+  $('#search').value = '';
+  applyFilter();
+  toast('✕ Filtros avanzados y búsqueda limpiados');
+});
 $$('.filter-chip').forEach(c => c.addEventListener('click', () => {
   $$('.filter-chip').forEach(x => x.classList.remove('active'));
   c.classList.add('active');
@@ -1336,7 +1734,22 @@ $('#btn-remove-sel').addEventListener('click', () => {
 });
 $('#global-format').addEventListener('change', (e) => {
   const f = e.target.value;
-  if (!f) return;
+  if (!f) {
+    // "— por archivo —": volver al formato por defecto de CADA archivo
+    // (antes esta opción no hacía nada y los archivos se quedaban en el
+    // último formato global elegido).
+    sessionPrefs.format = '';
+    let n = 0;
+    for (const en of FILES.values()) {
+      if (en.status === 'invalid' || !en.selected) continue;
+      en.format = defaultFormatFor(en);
+      if (en.els.fmt) en.els.fmt.value = en.format;
+      if (en.els.qwrap) en.els.qwrap.style.display = ['jpg','webp'].includes(en.format) ? '' : 'none';
+      n++;
+    }
+    if (n) toast(`↩ Formato restaurado <b>por archivo</b> en ${n} seleccionado(s)`);
+    return;
+  }
   sessionPrefs.format = f;
   for (const en of FILES.values()) {
     if (en.status === 'invalid' || !en.selected) continue;

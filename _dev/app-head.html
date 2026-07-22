@@ -152,6 +152,25 @@ body.has-files #dropzone p{font-size:11.5px;margin-bottom:10px}
 .filter-chip.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
 .filter-chip .n{font-family:var(--font-mono);font-size:10.5px;opacity:.85;margin-left:2px}
 
+/* ============ FILTROS AVANZADOS (FACETAS) ============ */
+#facets{
+  display:none;flex-direction:column;gap:7px;margin-top:10px;padding:12px 14px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+}
+.facet-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.facet-label{
+  font-family:var(--font-mono);font-size:10px;letter-spacing:1.2px;color:var(--text-2);
+  text-transform:uppercase;min-width:74px;
+}
+.facet-chip{
+  padding:4px 11px;border-radius:99px;border:1px solid var(--border);background:transparent;
+  color:var(--text-2);font-size:11.5px;transition:all .18s;
+}
+.facet-chip:hover{color:var(--text);border-color:var(--border-2);background:var(--surface-2)}
+.facet-chip.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.facet-chip .n{font-family:var(--font-mono);font-size:10px;opacity:.85}
+#facet-clear{margin-left:auto}
+
 /* ============ GRID DE TARJETAS ============ */
 #list{margin-top:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(470px,1fr));gap:12px;align-items:start}
 .card{
