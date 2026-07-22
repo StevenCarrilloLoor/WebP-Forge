@@ -211,6 +211,10 @@
         <span>Calidad por defecto (JPG / WebP)</span>
         <span class="settings-ctl"><input type="range" id="cfg-calidad" min="10" max="100" step="5"> <b id="cfg-calidad-v"></b>%</span>
       </label>
+      <label class="settings-row" title="Máxima: bitrate a tope (piso 16 Mbps, escala con la resolución) — el tamaño del archivo no importa, la calidad manda. Alta: bitrate equilibrado según resolución y fps. Nota: re-codificar a un formato lossy nunca puede SUPERAR la calidad del original; Máxima garantiza no perder de más.">
+        <span>Bitrate de video (MP4 / WebM) — <b>la calidad manda</b></span>
+        <span class="settings-ctl"><select id="cfg-calidad-video"><option value="maxima">Máxima (tamaño libre)</option><option value="alta">Alta (equilibrada)</option></select></span>
+      </label>
     </div>
 
     <div class="settings-actions">

@@ -223,6 +223,19 @@ const check = (name, cond, extra) => {
   $('#cfg-guardar').click();
   check('restaurar deja el umbral en 10 s', window.WEBPFORGE.CONFIG.umbralCortoMs === 10000);
 
+  // ===== Política de calidad de video: MÁXIMA por defecto =====
+  check('calidadVideo por defecto = maxima', window.WEBPFORGE.CONFIG.calidadVideo === 'maxima');
+  check('bitrate máxima: piso de 16 Mbps en video pequeño', window.videoBitrateFor(128, 96, 30) === 16000000);
+  check('bitrate máxima: escala en 4K (>16 Mbps)', window.videoBitrateFor(3840, 2160, 30) > 16000000);
+  $('#btn-settings').click();
+  $('#cfg-calidad-video').value = 'alta';
+  $('#cfg-guardar').click();
+  check('modo alta: heurística equilibrada (<16 Mbps en video pequeño)', window.videoBitrateFor(128, 96, 30) < 16000000);
+  $('#btn-settings').click();
+  $('#cfg-restaurar').click();
+  $('#cfg-guardar').click();
+  check('restaurar vuelve a maxima', window.WEBPFORGE.CONFIG.calidadVideo === 'maxima');
+
   // Detección directa adicional (header parcial + fullSize)
   const buf = fs.readFileSync('test-assets/animated.webp');
   const head = buf.buffer.slice(buf.byteOffset, buf.byteOffset + 64);

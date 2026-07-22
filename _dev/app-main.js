@@ -62,6 +62,9 @@ const CONFIG_DEFECTO = {
   fmtWebpAnim: 'auto',           // WebP animado corto entrante
   fmtVideo: 'auto',              // video con audio o largo
   calidad: 100,
+  // 'maxima': bitrate a tope (escala con la resolución, piso 16 Mbps) — la
+  // calidad NUNCA se sacrifica por tamaño. 'alta': heurística equilibrada.
+  calidadVideo: 'maxima',
 };
 let CONFIG = { ...CONFIG_DEFECTO };
 try { CONFIG = { ...CONFIG_DEFECTO, ...JSON.parse(localStorage.getItem('wf-config') || '{}') }; } catch {}
@@ -665,10 +668,17 @@ async function decodeAllFrames(entry, onProg, firstOnly) {
   return [{ bmp, delayMs: 100 }];
 }
 
-// Bitrate razonable según resolución y fps. Antes eran 16 Mbps FIJOS y un
-// WebM de 2 MB salía como video de 5-7 MB (+163%/+227% reportado en uso real).
+// Bitrate según la política de calidad configurada.
+// 'maxima' (por defecto): ~0.25 bits/píxel/frame con PISO de 16 Mbps y techo
+//   de 100 Mbps — prioriza calidad absoluta; el tamaño no importa. (Más bits
+//   nunca SUPERAN la calidad del origen, pero garantizan no perder de más.)
+// 'alta': ~0.09 bpp equilibrado (archivos sensatos, calidad alta).
 function videoBitrateFor(w, h, fps) {
-  return Math.max(1_200_000, Math.min(16_000_000, Math.round(w * h * Math.min(fps || 30, 60) * 0.09)));
+  const bpf = w * h * Math.min(fps || 30, 60);
+  if ((CONFIG.calidadVideo || 'maxima') === 'maxima') {
+    return Math.min(100_000_000, Math.max(16_000_000, Math.round(bpf * 0.25)));
+  }
+  return Math.max(1_200_000, Math.min(16_000_000, Math.round(bpf * 0.09)));
 }
 // Elige el primer códec H.264 soportado. Devuelve { codec, hw } o null.
 async function pickH264(W, H) {
@@ -1866,6 +1876,7 @@ function configALosControles() {
   $('#cfg-fmt-video').value = CONFIG.fmtVideo;
   $('#cfg-calidad').value = CONFIG.calidad;
   $('#cfg-calidad-v').textContent = CONFIG.calidad;
+  $('#cfg-calidad-video').value = CONFIG.calidadVideo || 'maxima';
 }
 function abrirAjustes() { configALosControles(); $('#settings-modal').classList.add('open'); }
 function cerrarAjustes() { $('#settings-modal').classList.remove('open'); }
@@ -1888,6 +1899,7 @@ $('#cfg-guardar').addEventListener('click', () => {
   CONFIG.fmtWebpAnim = $('#cfg-fmt-webp-anim').value;
   CONFIG.fmtVideo = $('#cfg-fmt-video').value;
   CONFIG.calidad = Math.max(10, Math.min(100, +$('#cfg-calidad').value || 100));
+  CONFIG.calidadVideo = $('#cfg-calidad-video').value === 'alta' ? 'alta' : 'maxima';
   try { localStorage.setItem('wf-config', JSON.stringify(CONFIG)); } catch {}
   sessionPrefs.quality = CONFIG.calidad;
   actualizarEtiquetasUmbral();
