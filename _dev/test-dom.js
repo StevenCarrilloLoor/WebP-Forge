@@ -188,6 +188,41 @@ const check = (name, cond, extra) => {
     return ok;
   })());
 
+  // ===== Panel colapsable + filtros aplicados (rediseño Baymard/NN-g) =====
+  const tgl = $('#facets-toggle');
+  check('toggle de filtros existe', !!tgl && !!$('#facets-count'));
+  tgl.click();
+  check('toggle abre el panel', $('#facets').classList.contains('open'));
+  clickFacet('fmt', 'gif');
+  check('chip aplicado visible', $('#applied-filters').classList.contains('visible') && $$('#af-chips .af-chip').length === 1);
+  check('contador del toggle (1)', $('#facets-count').textContent === '(1)');
+  window.document.querySelector('#af-chips .af-x').click();
+  check('quitar chip aplicado limpia la faceta', $$('#af-chips .af-chip').length === 0 && vis() === 5);
+  tgl.click();
+  check('toggle cierra el panel', !$('#facets').classList.contains('open'));
+
+  // ===== ⚙ Configuración (métricas y formatos editables) =====
+  check('CONFIG expuesta con umbral por defecto', window.WEBPFORGE.CONFIG && window.WEBPFORGE.CONFIG.umbralCortoMs === 10000);
+  $('#btn-settings').click();
+  check('modal de ajustes abre', $('#settings-modal').classList.contains('open'));
+  $('#cfg-umbral').value = '3';
+  $('#cfg-fmt-webp-estatico').value = 'jpg';
+  $('#cfg-guardar').click();
+  check('modal cierra al guardar', !$('#settings-modal').classList.contains('open'));
+  check('umbral guardado (3 s)', window.WEBPFORGE.CONFIG.umbralCortoMs === 3000);
+  const CAPS2 = window.WEBPFORGE.CAP;
+  const oldMp4b = CAPS2.mp4;
+  CAPS2.mp4 = true;
+  check('umbral afecta la regla (5.6s ya no es corto → mp4)', window.defaultFormatFor({ kind: 'video', info: { type: 'webm', durationMs: 5600, hasAudio: false } }) === 'mp4');
+  CAPS2.mp4 = oldMp4b;
+  check('formato configurado aplica (webp estático → jpg)', window.defaultFormatFor({ kind: 'webp', info: { type: 'lossy', animated: false, durationMs: 0 } }) === 'jpg');
+  check('etiqueta de faceta refleja el umbral', window.document.querySelector('.facet-chip[data-facet="dur"][data-val="short"]').textContent.includes('3 s'));
+  check('re-aplicar recalculó los cargados', [...window.WEBPFORGE.FILES.values()].filter(e => e.status === 'ready').every(e => e.format === window.defaultFormatFor(e)));
+  $('#btn-settings').click();
+  $('#cfg-restaurar').click();
+  $('#cfg-guardar').click();
+  check('restaurar deja el umbral en 10 s', window.WEBPFORGE.CONFIG.umbralCortoMs === 10000);
+
   // Detección directa adicional (header parcial + fullSize)
   const buf = fs.readFileSync('test-assets/animated.webp');
   const head = buf.buffer.slice(buf.byteOffset, buf.byteOffset + 64);

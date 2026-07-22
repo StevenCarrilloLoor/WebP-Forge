@@ -135,6 +135,34 @@ NOVEDADES v1.5 — SEEK CORRECTO EN VIDEO + MP4 REAL + REDISEÑO
   cargar archivos, tarjetas con franja de estado, miniaturas @2x, modal y
   toasts renovados. Misma estructura de IDs: los tests de DOM siguen pasando.
 
+NOVEDADES v1.6 — CONTROL DEL USUARIO + FILTROS PRO + VIDEO→MP4 SÓLIDO
+- ⚙ CONFIGURACIÓN persistente (localStorage): umbral de "animación corta",
+  regla video-mudo→GIF (activable y con destino configurable), formato por
+  defecto de cada tipo de entrada y calidad por defecto. "Auto" = lógica
+  recomendada según capacidades. Re-aplicable a los archivos ya cargados.
+- Regla nueva de métricas: video ≤ umbral SIN pista de audio propone GIF
+  (el audio se detecta a nivel de contenedor con parsers propios).
+- Filtros avanzados rediseñados según NN/g · Baymard · PatternFly: panel
+  COLAPSABLE con contador de activos, grupos en tarjetas (Formato con
+  subtipos WebP, Duración según umbral, Audio, Estado) y fila de FILTROS
+  APLICADOS con chips removibles (×) + "Limpiar todo" siempre visible.
+  Combinables entre sí, con la búsqueda y con "✓ Visibles".
+- "— por archivo —" vuelve a calcular el formato por defecto de cada
+  archivo (antes no revertía nada).
+- Video→MP4 sin audio en 3 niveles: transcodificación (demux EBML propio +
+  VideoDecoder + H.264, más rápida que tiempo real) → captura rVFC en
+  tiempo real → WebM clásico. Reintento HW→software (NVENC rechaza
+  resoluciones pequeñas), frames normalizados vía canvas (algunos encoders
+  no aceptan YUV: "Unexpected frame format") y flush protegido que ya no
+  enmascara el error original. Verificado en la app de escritorio: MP4 real
+  transcodificado en 0.3 s.
+- Bitrate heurístico por resolución/fps en todas las vías (los 16 Mbps
+  fijos inflaban los archivos +163%/+227%).
+- Análisis de video blindado: si el <video> del navegador se cuelga (visto
+  en uso real), los metadatos salen del contenedor (webmQuickMeta /
+  mp4QuickMeta / recorrido de bloques) y la validación cae a un chequeo
+  estructural. probeVideo con timeout de 6 s.
+
 QUÉ MEJORARÍA CON MÁS TIEMPO / BACKEND
 - Re-codificación de video→video también por WebCodecs (hoy usa MediaRecorder
   en tiempo real + remux; con VideoDecoder haría falta demuxear el origen).

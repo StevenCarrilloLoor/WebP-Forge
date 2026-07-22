@@ -10,6 +10,7 @@
   </div>
   <div id="api-status" title="Capacidades detectadas en este navegador"></div>
   <div id="global-counter"><b>0</b> archivos &nbsp;|&nbsp; <b>0</b> completados &nbsp;|&nbsp; <b>0</b> procesando</div>
+  <button class="btn btn-sm" id="btn-settings" title="Configuración: métricas y formatos automáticos">⚙ Ajustes</button>
 </header>
 
 <main>
@@ -64,42 +65,63 @@
     <button class="filter-chip" data-f="video">🟠 Video <span class="n"></span></button>
     <button class="filter-chip" data-f="done">✅ Completados <span class="n"></span></button>
     <button class="filter-chip" data-f="error">⛔ Con error <span class="n"></span></button>
+    <button id="facets-toggle" title="Filtros avanzados: formato, duración, audio y estado">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1.5 3h13M4 8h8M6.5 13h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      Filtros <span class="n" id="facets-count"></span>
+      <span class="caret">▾</span>
+    </button>
+  </div>
+
+  <!-- FILTROS APLICADOS (resumen removible, patrón Baymard: siempre a la vista) -->
+  <div id="applied-filters">
+    <span class="af-label">Filtros activos</span>
+    <div id="af-chips"></div>
+    <button id="facet-clear" title="Quita los filtros avanzados y la búsqueda">✕ Limpiar todo</button>
   </div>
 
   <!-- FILTROS AVANZADOS (facetas combinables; se suman a los chips, a la búsqueda y a ✓ Visibles) -->
   <div id="facets">
     <div class="facet-group">
-      <span class="facet-label">Formato</span>
-      <button class="facet-chip" data-facet="fmt" data-val="webp">WebP <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="gif">GIF <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="png">PNG <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="jpg">JPG <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="bmp">BMP <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="webm">WebM <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="mp4">MP4 <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="mkv">MKV <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="lossy" title="WebP lossy (VP8)">WebP·lossy <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="lossless" title="WebP lossless (VP8L)">WebP·lossless <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="extended" title="WebP extendido (VP8X, incluye animados)">WebP·VP8X <span class="n"></span></button>
+      <span class="facet-label">Formato de origen</span>
+      <div class="facet-chips">
+        <button class="facet-chip" data-facet="fmt" data-val="webp">WebP <span class="n"></span></button>
+        <button class="facet-chip" data-facet="fmt" data-val="gif">GIF <span class="n"></span></button>
+        <button class="facet-chip" data-facet="fmt" data-val="png">PNG <span class="n"></span></button>
+        <button class="facet-chip" data-facet="fmt" data-val="jpg">JPG <span class="n"></span></button>
+        <button class="facet-chip" data-facet="fmt" data-val="bmp">BMP <span class="n"></span></button>
+        <button class="facet-chip" data-facet="fmt" data-val="webm">WebM <span class="n"></span></button>
+        <button class="facet-chip" data-facet="fmt" data-val="mp4">MP4 <span class="n"></span></button>
+        <button class="facet-chip" data-facet="fmt" data-val="mkv">MKV <span class="n"></span></button>
+      </div>
+      <div class="facet-chips facet-sub">
+        <button class="facet-chip" data-facet="fmt" data-val="lossy" title="WebP lossy (VP8)">lossy <span class="n"></span></button>
+        <button class="facet-chip" data-facet="fmt" data-val="lossless" title="WebP lossless (VP8L)">lossless <span class="n"></span></button>
+        <button class="facet-chip" data-facet="fmt" data-val="extended" title="WebP extendido (VP8X, incluye animados)">VP8X <span class="n"></span></button>
+      </div>
     </div>
     <div class="facet-group">
       <span class="facet-label">Duración</span>
-      <button class="facet-chip" data-facet="dur" data-val="short">≤ 10 s <span class="n"></span></button>
-      <button class="facet-chip" data-facet="dur" data-val="long">&gt; 10 s <span class="n"></span></button>
-      <button class="facet-chip" data-facet="dur" data-val="static">Sin duración <span class="n"></span></button>
+      <div class="facet-chips">
+        <button class="facet-chip" data-facet="dur" data-val="short">≤ 10 s <span class="n"></span></button>
+        <button class="facet-chip" data-facet="dur" data-val="long">&gt; 10 s <span class="n"></span></button>
+        <button class="facet-chip" data-facet="dur" data-val="static">Sin duración <span class="n"></span></button>
+      </div>
     </div>
     <div class="facet-group">
       <span class="facet-label">Audio</span>
-      <button class="facet-chip" data-facet="audio" data-val="con">🔊 Con audio <span class="n"></span></button>
-      <button class="facet-chip" data-facet="audio" data-val="sin">🔇 Sin audio <span class="n"></span></button>
+      <div class="facet-chips">
+        <button class="facet-chip" data-facet="audio" data-val="con">🔊 Con audio <span class="n"></span></button>
+        <button class="facet-chip" data-facet="audio" data-val="sin">🔇 Sin audio <span class="n"></span></button>
+      </div>
     </div>
     <div class="facet-group">
       <span class="facet-label">Estado</span>
-      <button class="facet-chip" data-facet="estado" data-val="ready">⚪ Pendiente <span class="n"></span></button>
-      <button class="facet-chip" data-facet="estado" data-val="processing">🔵 Procesando <span class="n"></span></button>
-      <button class="facet-chip" data-facet="estado" data-val="done">✅ Completado <span class="n"></span></button>
-      <button class="facet-chip" data-facet="estado" data-val="error">⛔ Error <span class="n"></span></button>
-      <button class="btn btn-sm" id="facet-clear" style="display:none">✕ Limpiar filtros</button>
+      <div class="facet-chips">
+        <button class="facet-chip" data-facet="estado" data-val="ready">⚪ Pendiente <span class="n"></span></button>
+        <button class="facet-chip" data-facet="estado" data-val="processing">🔵 Procesando <span class="n"></span></button>
+        <button class="facet-chip" data-facet="estado" data-val="done">✅ Completado <span class="n"></span></button>
+        <button class="facet-chip" data-facet="estado" data-val="error">⛔ Error <span class="n"></span></button>
+      </div>
     </div>
   </div>
 
@@ -134,6 +156,69 @@
     <div class="compare">
       <div class="pane"><h5 id="pane-orig-title">ORIGINAL</h5><div id="pane-orig"></div><div class="sz" id="sz-orig"></div></div>
       <div class="pane"><h5 id="pane-res-title">RESULTADO</h5><div id="pane-res"></div><div class="sz" id="sz-res"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DE CONFIGURACIÓN: métricas y formatos automáticos -->
+<div id="settings-modal" role="dialog" aria-modal="true">
+  <div class="modal-box settings-box">
+    <div class="modal-head">
+      <h3>⚙ Configuración</h3>
+      <button class="btn btn-sm" id="settings-close">✕ Cerrar</button>
+    </div>
+    <p class="settings-intro">Controla las métricas y umbrales con los que la app decide el formato de conversión automático. "Auto" usa la lógica recomendada según las capacidades del navegador.</p>
+
+    <div class="settings-section">
+      <h4>Métricas de clasificación</h4>
+      <label class="settings-row">
+        <span>Umbral de "animación corta" — hasta cuántos <b>segundos</b> algo se trata como animación (GIF por defecto, filtro ≤/&gt;)</span>
+        <span class="settings-ctl"><input type="number" id="cfg-umbral" min="1" max="600" step="1"> s</span>
+      </label>
+      <label class="settings-row">
+        <span>Video corto <b>sin audio</b> → tratarlo como animación (el sonido no influye)</span>
+        <span class="settings-ctl"><input type="checkbox" id="cfg-regla-mudo"></span>
+      </label>
+      <label class="settings-row">
+        <span>Destino para ese video corto sin audio</span>
+        <span class="settings-ctl"><select id="cfg-destino-mudo"><option value="gif">GIF</option><option value="webp">WebP animado</option><option value="mp4">MP4</option></select></span>
+      </label>
+    </div>
+
+    <div class="settings-section">
+      <h4>Formatos de conversión por defecto</h4>
+      <label class="settings-row">
+        <span>Imagen estática (PNG / JPG / BMP / GIF de 1 frame)</span>
+        <span class="settings-ctl"><select id="cfg-fmt-imagen"><option value="auto">Auto (WebP)</option><option value="webp">WebP</option><option value="png">PNG</option><option value="jpg">JPG</option><option value="bmp">BMP</option></select></span>
+      </label>
+      <label class="settings-row">
+        <span>WebP estático</span>
+        <span class="settings-ctl"><select id="cfg-fmt-webp-estatico"><option value="auto">Auto (PNG, máxima calidad)</option><option value="png">PNG</option><option value="jpg">JPG</option><option value="bmp">BMP</option></select></span>
+      </label>
+      <label class="settings-row">
+        <span>GIF animado</span>
+        <span class="settings-ctl"><select id="cfg-fmt-gif-anim"><option value="auto">Auto (WebP animado)</option><option value="webp">WebP animado</option><option value="mp4">MP4</option><option value="webm">WebM</option></select></span>
+      </label>
+      <label class="settings-row">
+        <span>WebP animado corto (≤ umbral)</span>
+        <span class="settings-ctl"><select id="cfg-fmt-webp-anim"><option value="auto">Auto (GIF)</option><option value="gif">GIF</option><option value="mp4">MP4</option><option value="webm">WebM</option></select></span>
+      </label>
+      <label class="settings-row">
+        <span>Video (WebM / MP4 / MKV con audio o largo)</span>
+        <span class="settings-ctl"><select id="cfg-fmt-video"><option value="auto">Auto (el otro contenedor)</option><option value="mp4">MP4</option><option value="webm">WebM</option><option value="gif">GIF</option></select></span>
+      </label>
+      <label class="settings-row">
+        <span>Calidad por defecto (JPG / WebP)</span>
+        <span class="settings-ctl"><input type="range" id="cfg-calidad" min="10" max="100" step="5"> <b id="cfg-calidad-v"></b>%</span>
+      </label>
+    </div>
+
+    <div class="settings-actions">
+      <label class="opt" style="margin-right:auto" title="Recalcula el formato sugerido de los archivos ya cargados que aún no se han convertido">
+        <input type="checkbox" id="cfg-reaplicar" checked> Re-aplicar a los archivos ya cargados
+      </label>
+      <button class="btn btn-sm" id="cfg-restaurar">↺ Valores de fábrica</button>
+      <button class="btn btn-primary btn-sm" id="cfg-guardar">💾 Guardar</button>
     </div>
   </div>
 </div>

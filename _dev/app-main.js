@@ -49,6 +49,23 @@ let queueRunning = false;
 const sessionPrefs = { format: '', quality: 100 }; // política: máxima calidad por defecto
 // Opciones del usuario (toggles de la barra de controles)
 const SETTINGS = { gpu: true, fidelity: true };
+// ---------- CONFIGURACIÓN persistente: métricas y formatos automáticos ----------
+// Editable desde ⚙ Ajustes; controla el umbral de "animación corta", la regla
+// de video mudo→GIF y los formatos de conversión por defecto de cada tipo.
+const CONFIG_DEFECTO = {
+  umbralCortoMs: 10000,          // hasta aquí, una animación/video se trata como "corto"
+  reglaVideoMudoGif: true,       // video ≤ umbral sin audio → destinoVideoMudo
+  destinoVideoMudo: 'gif',
+  fmtImagen: 'auto',             // PNG/JPG/BMP/GIF estático entrante
+  fmtWebpEstatico: 'auto',       // WebP estático entrante
+  fmtGifAnim: 'auto',            // GIF animado entrante
+  fmtWebpAnim: 'auto',           // WebP animado corto entrante
+  fmtVideo: 'auto',              // video con audio o largo
+  calidad: 100,
+};
+let CONFIG = { ...CONFIG_DEFECTO };
+try { CONFIG = { ...CONFIG_DEFECTO, ...JSON.parse(localStorage.getItem('wf-config') || '{}') }; } catch {}
+sessionPrefs.quality = CONFIG.calidad;
 const stats = { startedAt: 0, batchDone: 0, batchTotal: 0, times: [] };
 
 // ---------- Helpers ----------
@@ -311,34 +328,35 @@ function defaultFormatFor(entry) {
   if (sessionPrefs.format) return sessionPrefs.format;
   const i = entry.info;
   const mp4Ok = CAP.mp4 || CAP.mp4Fast; // MediaRecorder O WebCodecs H.264
+  const corto = (i.durationMs || 0) <= CONFIG.umbralCortoMs;
+  const disponible = (f) => f === 'webp' ? CAP.webpEnc : f === 'mp4' ? mp4Ok : f === 'webm' ? CAP.webm : true;
+  const oAuto = (pref, autoFn) => (pref && pref !== 'auto' && disponible(pref)) ? pref : autoFn();
   if (entry.kind === 'video') {
-    // Video corto (≤10 s) y SIN audio: el sonido no pinta nada, así que el
-    // destino natural es GIF (comportamiento de animación).
-    if (i.durationMs <= 10000 && !i.hasAudio) return 'gif';
-    // Convertir al "otro" contenedor por defecto; MP4 es lo más universal
-    if (i.type !== 'mp4' && mp4Ok) return 'mp4';
-    if (i.type === 'mp4' && CAP.webm) return 'webm';
-    return mp4Ok ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
+    // Video corto y SIN audio: el sonido no pinta nada → animación (regla configurable)
+    if (CONFIG.reglaVideoMudoGif && corto && !i.hasAudio) return oAuto(CONFIG.destinoVideoMudo, () => 'gif');
+    return oAuto(CONFIG.fmtVideo, () => {
+      // Convertir al "otro" contenedor por defecto; MP4 es lo más universal
+      if (i.type !== 'mp4' && mp4Ok) return 'mp4';
+      if (i.type === 'mp4' && CAP.webm) return 'webm';
+      return mp4Ok ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
+    });
   }
   if (entry.kind === 'gif') {
     // GIF animado → WebP animado (mucho más pequeño); sin encoder WebP → video
-    if (CAP.webpEnc) return 'webp';
-    return mp4Ok ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
+    return oAuto(CONFIG.fmtGifAnim, () => CAP.webpEnc ? 'webp' : (mp4Ok ? 'mp4' : (CAP.webm ? 'webm' : 'gif')));
   }
   if (entry.kind === 'image') {
     // Imagen "normal" → WebP es la conversión típica
-    if (CAP.webpEnc) return 'webp';
-    return i.type === 'png' ? 'jpg' : 'png';
+    return oAuto(CONFIG.fmtImagen, () => CAP.webpEnc ? 'webp' : (i.type === 'png' ? 'jpg' : 'png'));
   }
   // Entrada WebP
   if (i.animated) {
-    if (i.durationMs > 10000) return mp4Ok ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
-    return 'gif';
+    if (!corto) return mp4Ok ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
+    return oAuto(CONFIG.fmtWebpAnim, () => 'gif');
   }
-  // Estático → PNG siempre: política de MÁXIMA CALIDAD (preferencia del usuario).
-  // PNG re-codifica sin ninguna pérdida adicional y conserva transparencia;
-  // el tamaño no es prioridad. (JPG sigue disponible en el selector.)
-  return 'png';
+  // Estático → PNG por defecto: política de MÁXIMA CALIDAD (re-codifica sin
+  // pérdida y conserva transparencia). Configurable en ⚙ Ajustes.
+  return oAuto(CONFIG.fmtWebpEstatico, () => 'png');
 }
 
 // Expande ZIPs: extrae los archivos compatibles que contengan (DecompressionStream nativo)
@@ -445,7 +463,7 @@ async function addFiles(fileList) {
   prog.style.display = 'none';
   $('#controls').style.display = 'flex';
   $('#filters').style.display = 'flex';
-  if ($('#facets')) $('#facets').style.display = 'flex';
+  actualizarVisibilidadFacetas();
   refreshCounters(); applyFilter();
   toast(`<b>${accepted.length}</b> archivo(s) añadidos`);
 }
@@ -461,7 +479,7 @@ function badgeFor(entry) {
   }
   if (i.animated) {
     const label = entry.kind === 'gif' ? 'GIF ANIMADO' : 'ANIMADO';
-    if (i.durationMs > 10000) return `<span class="badge video">🟠 ${label} · ${i.frames} frames · ${(i.durationMs/1000).toFixed(1)}s</span>`;
+    if (i.durationMs > CONFIG.umbralCortoMs) return `<span class="badge video">🟠 ${label} · ${i.frames} frames · ${(i.durationMs/1000).toFixed(1)}s</span>`;
     return `<span class="badge anim">🟣 ${label} · ${i.frames} frames</span>`;
   }
   const names = { lossy: 'LOSSY (VP8)', lossless: 'LOSSLESS (VP8L)', extended: 'ESTÁTICO (VP8X)', gif: 'GIF', png: 'PNG', jpg: 'JPEG', bmp: 'BMP' };
@@ -605,7 +623,8 @@ function removeEntry(entry) {
   if (!FILES.size) {
     $('#controls').style.display = 'none';
     $('#filters').style.display = 'none';
-    if ($('#facets')) $('#facets').style.display = 'none';
+    actualizarVisibilidadFacetas();
+    renderFiltrosAplicados();
   }
 }
 
@@ -1583,8 +1602,8 @@ function entryMatchesFilter(e, f) {
   switch (f) {
     case 'all': return true;
     case 'static': return e.kind !== 'video' && e.info && e.info.valid && !e.info.animated;
-    case 'anim': return e.kind !== 'video' && e.info && e.info.valid && e.info.animated && e.info.durationMs <= 10000;
-    case 'video': return (e.kind === 'video' && e.info && e.info.valid) || (e.kind !== 'video' && e.info && e.info.valid && e.info.animated && e.info.durationMs > 10000);
+    case 'anim': return e.kind !== 'video' && e.info && e.info.valid && e.info.animated && e.info.durationMs <= CONFIG.umbralCortoMs;
+    case 'video': return (e.kind === 'video' && e.info && e.info.valid) || (e.kind !== 'video' && e.info && e.info.valid && e.info.animated && e.info.durationMs > CONFIG.umbralCortoMs);
     case 'done': return e.status === 'done';
     case 'error': return e.status === 'error' || e.status === 'invalid';
   }
@@ -1601,8 +1620,8 @@ function entryMatchesFacets(e, except) {
   if (except !== 'fmt' && FACETS.fmt.size && !fmtDe(e).some(t => FACETS.fmt.has(t))) return false;
   if (except !== 'dur' && FACETS.dur !== 'all') {
     const d = i.durationMs || 0;
-    if (FACETS.dur === 'short' && !(d > 0 && d <= 10000)) return false;
-    if (FACETS.dur === 'long' && d <= 10000) return false;
+    if (FACETS.dur === 'short' && !(d > 0 && d <= CONFIG.umbralCortoMs)) return false;
+    if (FACETS.dur === 'long' && d <= CONFIG.umbralCortoMs) return false;
     if (FACETS.dur === 'static' && d > 0) return false;
   }
   if (except !== 'audio' && FACETS.audio !== 'all') {
@@ -1638,7 +1657,7 @@ function applyFilter() {
       if (facet === 'fmt') return val === 'webp' ? e.kind === 'webp' : i.type === val;
       if (facet === 'dur') {
         const d = i.durationMs || 0;
-        return val === 'short' ? (d > 0 && d <= 10000) : val === 'long' ? d > 10000 : d === 0;
+        return val === 'short' ? (d > 0 && d <= CONFIG.umbralCortoMs) : val === 'long' ? d > CONFIG.umbralCortoMs : d === 0;
       }
       if (facet === 'audio') return val === 'con' ? !!i.hasAudio : !i.hasAudio;
       if (facet === 'estado') return (e.status === 'invalid' ? 'error' : e.status) === val;
@@ -1648,21 +1667,68 @@ function applyFilter() {
     const el = $('.n', chip);
     if (el) el.textContent = n ? `(${n})` : '';
   }
-  const clearBtn = $('#facet-clear');
-  if (clearBtn) clearBtn.style.display = (facetsActive() || searchTerm) ? '' : 'none';
+  renderFiltrosAplicados();
 }
+// -- Cambia una faceta y sincroniza los chips del panel --
+function cambiarFaceta(facet, val, forzar) {
+  if (facet === 'fmt') {
+    const on = forzar === undefined ? !FACETS.fmt.has(val) : forzar;
+    if (on) FACETS.fmt.add(val); else FACETS.fmt.delete(val);
+  } else {
+    const on = forzar === undefined ? FACETS[facet] !== val : forzar;
+    FACETS[facet] = on ? val : 'all';
+  }
+  $$('.facet-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.facet === 'fmt' ? FACETS.fmt.has(c.dataset.val) : FACETS[c.dataset.facet] === c.dataset.val);
+  });
+}
+// -- Resumen de filtros APLICADOS: chips removibles + contador del toggle --
+const NOMBRE_FACETA = { fmt: 'Formato', dur: 'Duración', audio: 'Audio', estado: 'Estado' };
+function renderFiltrosAplicados() {
+  const cont = $('#af-chips');
+  if (!cont) return;
+  const txtDur = { short: () => `≤ ${CONFIG.umbralCortoMs / 1000} s`, long: () => `> ${CONFIG.umbralCortoMs / 1000} s`, static: () => 'sin duración' };
+  const txtOtros = { con: '🔊 con audio', sin: '🔇 sin audio', ready: 'pendiente', processing: 'procesando', done: 'completado', error: 'error' };
+  const chips = [];
+  const chip = (facet, val, texto) => `<span class="af-chip"><small>${NOMBRE_FACETA[facet]}:</small> ${texto} <button class="af-x" data-facet="${facet}" data-val="${val}" title="Quitar este filtro">✕</button></span>`;
+  for (const v of FACETS.fmt) chips.push(chip('fmt', v, v === 'webp' ? 'WebP' : (v.length <= 4 ? v.toUpperCase() : v)));
+  if (FACETS.dur !== 'all') chips.push(chip('dur', FACETS.dur, txtDur[FACETS.dur]()));
+  if (FACETS.audio !== 'all') chips.push(chip('audio', FACETS.audio, txtOtros[FACETS.audio]));
+  if (FACETS.estado !== 'all') chips.push(chip('estado', FACETS.estado, txtOtros[FACETS.estado]));
+  if (searchTerm) chips.push(`<span class="af-chip"><small>Búsqueda:</small> “${escapeHtml(searchTerm)}” <button class="af-x" data-facet="search" data-val="" title="Quitar la búsqueda">✕</button></span>`);
+  cont.innerHTML = chips.join('');
+  $('#applied-filters').classList.toggle('visible', chips.length > 0 && FILES.size > 0);
+  const cnt = $('#facets-count');
+  if (cnt) cnt.textContent = chips.length ? `(${chips.length})` : '';
+  const t = $('#facets-toggle');
+  if (t) t.classList.toggle('has-active', chips.length > 0);
+}
+$('#applied-filters') && $('#applied-filters').addEventListener('click', (e) => {
+  const x = e.target.closest('.af-x');
+  if (!x) return;
+  if (x.dataset.facet === 'search') { searchTerm = ''; $('#search').value = ''; }
+  else cambiarFaceta(x.dataset.facet, x.dataset.val, false);
+  applyFilter();
+});
+// -- Panel colapsable (estado persistente) --
+let facetsOpen = false;
+try { facetsOpen = localStorage.getItem('wf-facets-open') === '1'; } catch {}
+function actualizarVisibilidadFacetas() {
+  const p = $('#facets');
+  if (!p) return;
+  p.classList.toggle('open', facetsOpen && FILES.size > 0);
+  const t = $('#facets-toggle');
+  if (t) t.classList.toggle('open', facetsOpen);
+}
+$('#facets-toggle') && $('#facets-toggle').addEventListener('click', () => {
+  facetsOpen = !facetsOpen;
+  try { localStorage.setItem('wf-facets-open', facetsOpen ? '1' : '0'); } catch {}
+  actualizarVisibilidadFacetas();
+});
 $('#facets') && $('#facets').addEventListener('click', (e) => {
   const chip = e.target.closest('.facet-chip');
   if (!chip) return;
-  const { facet, val } = chip.dataset;
-  if (facet === 'fmt') {
-    if (FACETS.fmt.has(val)) { FACETS.fmt.delete(val); chip.classList.remove('active'); }
-    else { FACETS.fmt.add(val); chip.classList.add('active'); }
-  } else {
-    const yaActivo = FACETS[facet] === val;
-    FACETS[facet] = yaActivo ? 'all' : val;
-    $$(`.facet-chip[data-facet="${facet}"]`).forEach(c => c.classList.toggle('active', !yaActivo && c.dataset.val === val));
-  }
+  cambiarFaceta(chip.dataset.facet, chip.dataset.val);
   applyFilter();
 });
 $('#facet-clear') && $('#facet-clear').addEventListener('click', () => {
@@ -1778,6 +1844,75 @@ $('#btn-clear').addEventListener('click', () => {
   for (const e of [...FILES.values()]) removeEntry(e);
 });
 
+// ---------- ⚙ CONFIGURACIÓN: modal, persistencia y aplicación ----------
+function actualizarEtiquetasUmbral() {
+  const s = CONFIG.umbralCortoMs / 1000;
+  const txt = Number.isInteger(s) ? s : s.toFixed(1);
+  const set = (val, t) => {
+    const el = document.querySelector(`.facet-chip[data-facet="dur"][data-val="${val}"]`);
+    if (el && el.childNodes.length) el.childNodes[0].nodeValue = t + ' ';
+  };
+  set('short', `≤ ${txt} s`);
+  set('long', `> ${txt} s`);
+}
+function configALosControles() {
+  $('#cfg-umbral').value = Math.round(CONFIG.umbralCortoMs / 1000);
+  $('#cfg-regla-mudo').checked = !!CONFIG.reglaVideoMudoGif;
+  $('#cfg-destino-mudo').value = CONFIG.destinoVideoMudo;
+  $('#cfg-fmt-imagen').value = CONFIG.fmtImagen;
+  $('#cfg-fmt-webp-estatico').value = CONFIG.fmtWebpEstatico;
+  $('#cfg-fmt-gif-anim').value = CONFIG.fmtGifAnim;
+  $('#cfg-fmt-webp-anim').value = CONFIG.fmtWebpAnim;
+  $('#cfg-fmt-video').value = CONFIG.fmtVideo;
+  $('#cfg-calidad').value = CONFIG.calidad;
+  $('#cfg-calidad-v').textContent = CONFIG.calidad;
+}
+function abrirAjustes() { configALosControles(); $('#settings-modal').classList.add('open'); }
+function cerrarAjustes() { $('#settings-modal').classList.remove('open'); }
+$('#btn-settings').addEventListener('click', abrirAjustes);
+$('#settings-close').addEventListener('click', cerrarAjustes);
+$('#settings-modal').addEventListener('click', (e) => { if (e.target.id === 'settings-modal') cerrarAjustes(); });
+$('#cfg-calidad').addEventListener('input', (e) => { $('#cfg-calidad-v').textContent = e.target.value; });
+$('#cfg-restaurar').addEventListener('click', () => {
+  CONFIG = { ...CONFIG_DEFECTO };
+  configALosControles();
+  toast('↺ Valores de fábrica cargados — pulsa <b>Guardar</b> para aplicarlos');
+});
+$('#cfg-guardar').addEventListener('click', () => {
+  CONFIG.umbralCortoMs = Math.max(1, Math.min(600, +$('#cfg-umbral').value || 10)) * 1000;
+  CONFIG.reglaVideoMudoGif = $('#cfg-regla-mudo').checked;
+  CONFIG.destinoVideoMudo = $('#cfg-destino-mudo').value;
+  CONFIG.fmtImagen = $('#cfg-fmt-imagen').value;
+  CONFIG.fmtWebpEstatico = $('#cfg-fmt-webp-estatico').value;
+  CONFIG.fmtGifAnim = $('#cfg-fmt-gif-anim').value;
+  CONFIG.fmtWebpAnim = $('#cfg-fmt-webp-anim').value;
+  CONFIG.fmtVideo = $('#cfg-fmt-video').value;
+  CONFIG.calidad = Math.max(10, Math.min(100, +$('#cfg-calidad').value || 100));
+  try { localStorage.setItem('wf-config', JSON.stringify(CONFIG)); } catch {}
+  sessionPrefs.quality = CONFIG.calidad;
+  actualizarEtiquetasUmbral();
+  let n = 0;
+  if ($('#cfg-reaplicar').checked) {
+    sessionPrefs.format = '';
+    for (const e of FILES.values()) {
+      if (e.status !== 'ready') continue;
+      e.format = defaultFormatFor(e);
+      e.quality = CONFIG.calidad;
+      if (e.els.fmt) e.els.fmt.value = e.format;
+      if (e.els.qwrap) e.els.qwrap.style.display = ['jpg', 'webp'].includes(e.format) ? '' : 'none';
+      const qv = e.els.card.querySelector('.qv');
+      if (qv) qv.textContent = e.quality + '%';
+      const qr = e.els.card.querySelector('[data-act=q]');
+      if (qr) qr.value = e.quality;
+      n++;
+    }
+  }
+  refreshCounters(); applyFilter();
+  cerrarAjustes();
+  toast(`💾 Configuración guardada${n ? ` — formato sugerido recalculado en <b>${n}</b> archivo(s)` : ''}`);
+});
+actualizarEtiquetasUmbral();
+
 // ---------- Drop zone ----------
 const dz = $('#dropzone');
 dz.addEventListener('click', (e) => { if (e.target === dz || e.target.closest('.dz-icon, h2, p')) $('#file-input').click(); });
@@ -1821,7 +1956,11 @@ dz.addEventListener('drop', handleDrop); // redundante a propósito: garantiza c
 // ---------- Atajos de teclado ----------
 document.addEventListener('keydown', (e) => {
   const inInput = /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName) && document.activeElement.type !== 'checkbox';
-  if (e.key === 'Escape') { closeModal(); return; }
+  if (e.key === 'Escape') {
+    if ($('#settings-modal') && $('#settings-modal').classList.contains('open')) { cerrarAjustes(); return; }
+    closeModal();
+    return;
+  }
   if (inInput) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); $('#btn-selall').click(); }
   else if (e.key === 'Enter' && FILES.size) { e.preventDefault(); $('#btn-convert').click(); }
@@ -1837,4 +1976,5 @@ window.addEventListener('beforeunload', () => {
 });
 
 // Hook de depuración/integración (consola): window.WEBPFORGE
-window.WEBPFORGE = { version: '1.5.0', SETTINGS, FILES, CAP, addFiles, parseWebP, detectContainer };
+window.WEBPFORGE = { version: '1.6.0', SETTINGS, FILES, CAP, addFiles, parseWebP, detectContainer };
+Object.defineProperty(window.WEBPFORGE, 'CONFIG', { get: () => CONFIG });

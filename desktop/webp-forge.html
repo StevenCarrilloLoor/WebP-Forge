@@ -153,23 +153,106 @@ body.has-files #dropzone p{font-size:11.5px;margin-bottom:10px}
 .filter-chip .n{font-family:var(--font-mono);font-size:10.5px;opacity:.85;margin-left:2px}
 
 /* ============ FILTROS AVANZADOS (FACETAS) ============ */
+/* Patrón investigado (NN/g · Baymard · PatternFly): panel colapsable con
+   contador de activos, grupos en tarjetas y resumen de filtros APLICADOS
+   como chips removibles siempre a la vista. */
+#facets-toggle{
+  display:inline-flex;align-items:center;gap:7px;margin-left:auto;
+  padding:6px 14px;border-radius:99px;border:1px solid var(--border-2);
+  background:var(--surface);color:var(--text-2);font-size:12px;font-weight:500;transition:all .2s;
+}
+#facets-toggle:hover{color:var(--text);border-color:var(--accent)}
+#facets-toggle.open,#facets-toggle.has-active{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+#facets-toggle .n{font-family:var(--font-mono);font-size:10.5px}
+#facets-toggle .caret{font-size:9px;transition:transform .2s;opacity:.8}
+#facets-toggle.open .caret{transform:rotate(180deg)}
 #facets{
-  display:none;flex-direction:column;gap:7px;margin-top:10px;padding:12px 14px;
+  display:none;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin-top:10px;
+}
+#facets.open{display:grid;animation:facetsIn .18s ease}
+@keyframes facetsIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.facet-group{
   background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:11px 13px 12px;display:flex;flex-direction:column;gap:8px;
 }
-.facet-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .facet-label{
-  font-family:var(--font-mono);font-size:10px;letter-spacing:1.2px;color:var(--text-2);
-  text-transform:uppercase;min-width:74px;
+  font-family:var(--font-mono);font-size:9.5px;letter-spacing:1.4px;color:var(--text-2);
+  text-transform:uppercase;
 }
+.facet-chips{display:flex;gap:5px;flex-wrap:wrap}
+.facet-sub{padding-top:2px;border-top:1px dashed var(--border);margin-top:2px}
 .facet-chip{
-  padding:4px 11px;border-radius:99px;border:1px solid var(--border);background:transparent;
-  color:var(--text-2);font-size:11.5px;transition:all .18s;
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4.5px 11px;border-radius:8px;border:1px solid var(--border);background:var(--bg-2);
+  color:var(--text-2);font-size:11.5px;transition:all .16s;
 }
 .facet-chip:hover{color:var(--text);border-color:var(--border-2);background:var(--surface-2)}
-.facet-chip.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
-.facet-chip .n{font-family:var(--font-mono);font-size:10px;opacity:.85}
-#facet-clear{margin-left:auto}
+.facet-chip.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.facet-chip .n{font-family:var(--font-mono);font-size:10px;opacity:.75}
+.facet-chip.active .n{opacity:.9}
+
+/* ============ FILTROS APLICADOS (resumen removible) ============ */
+#applied-filters{
+  display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;
+  padding:8px 12px;background:var(--accent-soft);border:1px solid rgba(56,189,248,.3);border-radius:var(--r-sm);
+}
+#applied-filters.visible{display:flex}
+.af-label{font-family:var(--font-mono);font-size:10px;letter-spacing:1.2px;color:var(--accent);text-transform:uppercase}
+#af-chips{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+.af-chip{
+  display:inline-flex;align-items:center;gap:7px;padding:3.5px 6px 3.5px 11px;border-radius:99px;
+  background:var(--surface);border:1px solid var(--accent);color:var(--text);font-size:11.5px;cursor:default;
+}
+.af-chip small{color:var(--text-2);font-size:10px}
+.af-chip .af-x{
+  display:grid;place-items:center;width:16px;height:16px;border-radius:99px;border:none;
+  background:var(--surface-3);color:var(--text-2);font-size:10px;line-height:1;cursor:pointer;transition:all .15s;
+}
+.af-chip .af-x:hover{background:var(--err-soft);color:var(--err)}
+#facet-clear{
+  padding:5px 12px;border-radius:99px;border:1px solid rgba(248,113,113,.4);background:transparent;
+  color:var(--err);font-size:11.5px;font-weight:500;transition:all .18s;
+}
+#facet-clear:hover{background:var(--err-soft);border-color:var(--err)}
+
+/* ============ MODAL DE CONFIGURACIÓN ============ */
+#settings-modal{
+  position:fixed;inset:0;z-index:110;display:none;align-items:center;justify-content:center;padding:24px;
+  background:rgba(5,7,10,.86);backdrop-filter:blur(10px);
+}
+#settings-modal.open{display:flex}
+.settings-box{max-width:640px}
+.settings-intro{color:var(--text-2);font-size:12.5px;margin-bottom:14px}
+.settings-section{
+  background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:12px;
+}
+.settings-section h4{
+  font-family:var(--font-mono);font-size:10px;letter-spacing:1.4px;color:var(--accent);
+  text-transform:uppercase;margin-bottom:10px;
+}
+.settings-row{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:7px 0;border-bottom:1px solid var(--border);font-size:12.5px;color:var(--text);cursor:default;
+}
+.settings-row:last-child{border-bottom:none}
+.settings-row>span:first-child{flex:1;line-height:1.45}
+.settings-row b{color:var(--accent);font-weight:600}
+.settings-ctl{display:inline-flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:12px;color:var(--text-2);flex-shrink:0}
+.settings-ctl input[type=number]{
+  width:70px;background:var(--surface-2);color:var(--text);border:1px solid var(--border-2);border-radius:8px;
+  padding:6px 9px;font-size:12.5px;outline:none;font-family:var(--font-mono);
+}
+.settings-ctl input[type=number]:focus{border-color:var(--accent)}
+.settings-ctl select{
+  background:var(--surface-2);color:var(--text);border:1px solid var(--border-2);border-radius:8px;
+  padding:6px 9px;font-size:12px;outline:none;
+}
+.settings-ctl select:focus,.settings-ctl select:hover{border-color:var(--accent)}
+.settings-ctl input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+.settings-ctl input[type=range]{width:120px;accent-color:var(--accent);cursor:pointer}
+.settings-actions{display:flex;align-items:center;gap:9px;margin-top:4px}
+.settings-actions .opt{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-2);cursor:pointer}
+.settings-actions .opt input{accent-color:var(--accent)}
 
 /* ============ GRID DE TARJETAS ============ */
 #list{margin-top:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(470px,1fr));gap:12px;align-items:start}
@@ -318,6 +401,7 @@ footer .keys{margin-top:6px}
   </div>
   <div id="api-status" title="Capacidades detectadas en este navegador"></div>
   <div id="global-counter"><b>0</b> archivos &nbsp;|&nbsp; <b>0</b> completados &nbsp;|&nbsp; <b>0</b> procesando</div>
+  <button class="btn btn-sm" id="btn-settings" title="Configuración: métricas y formatos automáticos">⚙ Ajustes</button>
 </header>
 
 <main>
@@ -372,42 +456,63 @@ footer .keys{margin-top:6px}
     <button class="filter-chip" data-f="video">🟠 Video <span class="n"></span></button>
     <button class="filter-chip" data-f="done">✅ Completados <span class="n"></span></button>
     <button class="filter-chip" data-f="error">⛔ Con error <span class="n"></span></button>
+    <button id="facets-toggle" title="Filtros avanzados: formato, duración, audio y estado">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1.5 3h13M4 8h8M6.5 13h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      Filtros <span class="n" id="facets-count"></span>
+      <span class="caret">▾</span>
+    </button>
+  </div>
+
+  <!-- FILTROS APLICADOS (resumen removible, patrón Baymard: siempre a la vista) -->
+  <div id="applied-filters">
+    <span class="af-label">Filtros activos</span>
+    <div id="af-chips"></div>
+    <button id="facet-clear" title="Quita los filtros avanzados y la búsqueda">✕ Limpiar todo</button>
   </div>
 
   <!-- FILTROS AVANZADOS (facetas combinables; se suman a los chips, a la búsqueda y a ✓ Visibles) -->
   <div id="facets">
     <div class="facet-group">
-      <span class="facet-label">Formato</span>
-      <button class="facet-chip" data-facet="fmt" data-val="webp">WebP <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="gif">GIF <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="png">PNG <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="jpg">JPG <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="bmp">BMP <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="webm">WebM <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="mp4">MP4 <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="mkv">MKV <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="lossy" title="WebP lossy (VP8)">WebP·lossy <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="lossless" title="WebP lossless (VP8L)">WebP·lossless <span class="n"></span></button>
-      <button class="facet-chip" data-facet="fmt" data-val="extended" title="WebP extendido (VP8X, incluye animados)">WebP·VP8X <span class="n"></span></button>
+      <span class="facet-label">Formato de origen</span>
+      <div class="facet-chips">
+        <button class="facet-chip" data-facet="fmt" data-val="webp">WebP <span class="n"></span></button>
+        <button class="facet-chip" data-facet="fmt" data-val="gif">GIF <span class="n"></span></button>
+        <button class="facet-chip" data-facet="fmt" data-val="png">PNG <span class="n"></span></button>
+        <button class="facet-chip" data-facet="fmt" data-val="jpg">JPG <span class="n"></span></button>
+        <button class="facet-chip" data-facet="fmt" data-val="bmp">BMP <span class="n"></span></button>
+        <button class="facet-chip" data-facet="fmt" data-val="webm">WebM <span class="n"></span></button>
+        <button class="facet-chip" data-facet="fmt" data-val="mp4">MP4 <span class="n"></span></button>
+        <button class="facet-chip" data-facet="fmt" data-val="mkv">MKV <span class="n"></span></button>
+      </div>
+      <div class="facet-chips facet-sub">
+        <button class="facet-chip" data-facet="fmt" data-val="lossy" title="WebP lossy (VP8)">lossy <span class="n"></span></button>
+        <button class="facet-chip" data-facet="fmt" data-val="lossless" title="WebP lossless (VP8L)">lossless <span class="n"></span></button>
+        <button class="facet-chip" data-facet="fmt" data-val="extended" title="WebP extendido (VP8X, incluye animados)">VP8X <span class="n"></span></button>
+      </div>
     </div>
     <div class="facet-group">
       <span class="facet-label">Duración</span>
-      <button class="facet-chip" data-facet="dur" data-val="short">≤ 10 s <span class="n"></span></button>
-      <button class="facet-chip" data-facet="dur" data-val="long">&gt; 10 s <span class="n"></span></button>
-      <button class="facet-chip" data-facet="dur" data-val="static">Sin duración <span class="n"></span></button>
+      <div class="facet-chips">
+        <button class="facet-chip" data-facet="dur" data-val="short">≤ 10 s <span class="n"></span></button>
+        <button class="facet-chip" data-facet="dur" data-val="long">&gt; 10 s <span class="n"></span></button>
+        <button class="facet-chip" data-facet="dur" data-val="static">Sin duración <span class="n"></span></button>
+      </div>
     </div>
     <div class="facet-group">
       <span class="facet-label">Audio</span>
-      <button class="facet-chip" data-facet="audio" data-val="con">🔊 Con audio <span class="n"></span></button>
-      <button class="facet-chip" data-facet="audio" data-val="sin">🔇 Sin audio <span class="n"></span></button>
+      <div class="facet-chips">
+        <button class="facet-chip" data-facet="audio" data-val="con">🔊 Con audio <span class="n"></span></button>
+        <button class="facet-chip" data-facet="audio" data-val="sin">🔇 Sin audio <span class="n"></span></button>
+      </div>
     </div>
     <div class="facet-group">
       <span class="facet-label">Estado</span>
-      <button class="facet-chip" data-facet="estado" data-val="ready">⚪ Pendiente <span class="n"></span></button>
-      <button class="facet-chip" data-facet="estado" data-val="processing">🔵 Procesando <span class="n"></span></button>
-      <button class="facet-chip" data-facet="estado" data-val="done">✅ Completado <span class="n"></span></button>
-      <button class="facet-chip" data-facet="estado" data-val="error">⛔ Error <span class="n"></span></button>
-      <button class="btn btn-sm" id="facet-clear" style="display:none">✕ Limpiar filtros</button>
+      <div class="facet-chips">
+        <button class="facet-chip" data-facet="estado" data-val="ready">⚪ Pendiente <span class="n"></span></button>
+        <button class="facet-chip" data-facet="estado" data-val="processing">🔵 Procesando <span class="n"></span></button>
+        <button class="facet-chip" data-facet="estado" data-val="done">✅ Completado <span class="n"></span></button>
+        <button class="facet-chip" data-facet="estado" data-val="error">⛔ Error <span class="n"></span></button>
+      </div>
     </div>
   </div>
 
@@ -442,6 +547,69 @@ footer .keys{margin-top:6px}
     <div class="compare">
       <div class="pane"><h5 id="pane-orig-title">ORIGINAL</h5><div id="pane-orig"></div><div class="sz" id="sz-orig"></div></div>
       <div class="pane"><h5 id="pane-res-title">RESULTADO</h5><div id="pane-res"></div><div class="sz" id="sz-res"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DE CONFIGURACIÓN: métricas y formatos automáticos -->
+<div id="settings-modal" role="dialog" aria-modal="true">
+  <div class="modal-box settings-box">
+    <div class="modal-head">
+      <h3>⚙ Configuración</h3>
+      <button class="btn btn-sm" id="settings-close">✕ Cerrar</button>
+    </div>
+    <p class="settings-intro">Controla las métricas y umbrales con los que la app decide el formato de conversión automático. "Auto" usa la lógica recomendada según las capacidades del navegador.</p>
+
+    <div class="settings-section">
+      <h4>Métricas de clasificación</h4>
+      <label class="settings-row">
+        <span>Umbral de "animación corta" — hasta cuántos <b>segundos</b> algo se trata como animación (GIF por defecto, filtro ≤/&gt;)</span>
+        <span class="settings-ctl"><input type="number" id="cfg-umbral" min="1" max="600" step="1"> s</span>
+      </label>
+      <label class="settings-row">
+        <span>Video corto <b>sin audio</b> → tratarlo como animación (el sonido no influye)</span>
+        <span class="settings-ctl"><input type="checkbox" id="cfg-regla-mudo"></span>
+      </label>
+      <label class="settings-row">
+        <span>Destino para ese video corto sin audio</span>
+        <span class="settings-ctl"><select id="cfg-destino-mudo"><option value="gif">GIF</option><option value="webp">WebP animado</option><option value="mp4">MP4</option></select></span>
+      </label>
+    </div>
+
+    <div class="settings-section">
+      <h4>Formatos de conversión por defecto</h4>
+      <label class="settings-row">
+        <span>Imagen estática (PNG / JPG / BMP / GIF de 1 frame)</span>
+        <span class="settings-ctl"><select id="cfg-fmt-imagen"><option value="auto">Auto (WebP)</option><option value="webp">WebP</option><option value="png">PNG</option><option value="jpg">JPG</option><option value="bmp">BMP</option></select></span>
+      </label>
+      <label class="settings-row">
+        <span>WebP estático</span>
+        <span class="settings-ctl"><select id="cfg-fmt-webp-estatico"><option value="auto">Auto (PNG, máxima calidad)</option><option value="png">PNG</option><option value="jpg">JPG</option><option value="bmp">BMP</option></select></span>
+      </label>
+      <label class="settings-row">
+        <span>GIF animado</span>
+        <span class="settings-ctl"><select id="cfg-fmt-gif-anim"><option value="auto">Auto (WebP animado)</option><option value="webp">WebP animado</option><option value="mp4">MP4</option><option value="webm">WebM</option></select></span>
+      </label>
+      <label class="settings-row">
+        <span>WebP animado corto (≤ umbral)</span>
+        <span class="settings-ctl"><select id="cfg-fmt-webp-anim"><option value="auto">Auto (GIF)</option><option value="gif">GIF</option><option value="mp4">MP4</option><option value="webm">WebM</option></select></span>
+      </label>
+      <label class="settings-row">
+        <span>Video (WebM / MP4 / MKV con audio o largo)</span>
+        <span class="settings-ctl"><select id="cfg-fmt-video"><option value="auto">Auto (el otro contenedor)</option><option value="mp4">MP4</option><option value="webm">WebM</option><option value="gif">GIF</option></select></span>
+      </label>
+      <label class="settings-row">
+        <span>Calidad por defecto (JPG / WebP)</span>
+        <span class="settings-ctl"><input type="range" id="cfg-calidad" min="10" max="100" step="5"> <b id="cfg-calidad-v"></b>%</span>
+      </label>
+    </div>
+
+    <div class="settings-actions">
+      <label class="opt" style="margin-right:auto" title="Recalcula el formato sugerido de los archivos ya cargados que aún no se han convertido">
+        <input type="checkbox" id="cfg-reaplicar" checked> Re-aplicar a los archivos ya cargados
+      </label>
+      <button class="btn btn-sm" id="cfg-restaurar">↺ Valores de fábrica</button>
+      <button class="btn btn-primary btn-sm" id="cfg-guardar">💾 Guardar</button>
     </div>
   </div>
 </div>
@@ -1928,6 +2096,23 @@ let queueRunning = false;
 const sessionPrefs = { format: '', quality: 100 }; // política: máxima calidad por defecto
 // Opciones del usuario (toggles de la barra de controles)
 const SETTINGS = { gpu: true, fidelity: true };
+// ---------- CONFIGURACIÓN persistente: métricas y formatos automáticos ----------
+// Editable desde ⚙ Ajustes; controla el umbral de "animación corta", la regla
+// de video mudo→GIF y los formatos de conversión por defecto de cada tipo.
+const CONFIG_DEFECTO = {
+  umbralCortoMs: 10000,          // hasta aquí, una animación/video se trata como "corto"
+  reglaVideoMudoGif: true,       // video ≤ umbral sin audio → destinoVideoMudo
+  destinoVideoMudo: 'gif',
+  fmtImagen: 'auto',             // PNG/JPG/BMP/GIF estático entrante
+  fmtWebpEstatico: 'auto',       // WebP estático entrante
+  fmtGifAnim: 'auto',            // GIF animado entrante
+  fmtWebpAnim: 'auto',           // WebP animado corto entrante
+  fmtVideo: 'auto',              // video con audio o largo
+  calidad: 100,
+};
+let CONFIG = { ...CONFIG_DEFECTO };
+try { CONFIG = { ...CONFIG_DEFECTO, ...JSON.parse(localStorage.getItem('wf-config') || '{}') }; } catch {}
+sessionPrefs.quality = CONFIG.calidad;
 const stats = { startedAt: 0, batchDone: 0, batchTotal: 0, times: [] };
 
 // ---------- Helpers ----------
@@ -2190,34 +2375,35 @@ function defaultFormatFor(entry) {
   if (sessionPrefs.format) return sessionPrefs.format;
   const i = entry.info;
   const mp4Ok = CAP.mp4 || CAP.mp4Fast; // MediaRecorder O WebCodecs H.264
+  const corto = (i.durationMs || 0) <= CONFIG.umbralCortoMs;
+  const disponible = (f) => f === 'webp' ? CAP.webpEnc : f === 'mp4' ? mp4Ok : f === 'webm' ? CAP.webm : true;
+  const oAuto = (pref, autoFn) => (pref && pref !== 'auto' && disponible(pref)) ? pref : autoFn();
   if (entry.kind === 'video') {
-    // Video corto (≤10 s) y SIN audio: el sonido no pinta nada, así que el
-    // destino natural es GIF (comportamiento de animación).
-    if (i.durationMs <= 10000 && !i.hasAudio) return 'gif';
-    // Convertir al "otro" contenedor por defecto; MP4 es lo más universal
-    if (i.type !== 'mp4' && mp4Ok) return 'mp4';
-    if (i.type === 'mp4' && CAP.webm) return 'webm';
-    return mp4Ok ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
+    // Video corto y SIN audio: el sonido no pinta nada → animación (regla configurable)
+    if (CONFIG.reglaVideoMudoGif && corto && !i.hasAudio) return oAuto(CONFIG.destinoVideoMudo, () => 'gif');
+    return oAuto(CONFIG.fmtVideo, () => {
+      // Convertir al "otro" contenedor por defecto; MP4 es lo más universal
+      if (i.type !== 'mp4' && mp4Ok) return 'mp4';
+      if (i.type === 'mp4' && CAP.webm) return 'webm';
+      return mp4Ok ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
+    });
   }
   if (entry.kind === 'gif') {
     // GIF animado → WebP animado (mucho más pequeño); sin encoder WebP → video
-    if (CAP.webpEnc) return 'webp';
-    return mp4Ok ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
+    return oAuto(CONFIG.fmtGifAnim, () => CAP.webpEnc ? 'webp' : (mp4Ok ? 'mp4' : (CAP.webm ? 'webm' : 'gif')));
   }
   if (entry.kind === 'image') {
     // Imagen "normal" → WebP es la conversión típica
-    if (CAP.webpEnc) return 'webp';
-    return i.type === 'png' ? 'jpg' : 'png';
+    return oAuto(CONFIG.fmtImagen, () => CAP.webpEnc ? 'webp' : (i.type === 'png' ? 'jpg' : 'png'));
   }
   // Entrada WebP
   if (i.animated) {
-    if (i.durationMs > 10000) return mp4Ok ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
-    return 'gif';
+    if (!corto) return mp4Ok ? 'mp4' : (CAP.webm ? 'webm' : 'gif');
+    return oAuto(CONFIG.fmtWebpAnim, () => 'gif');
   }
-  // Estático → PNG siempre: política de MÁXIMA CALIDAD (preferencia del usuario).
-  // PNG re-codifica sin ninguna pérdida adicional y conserva transparencia;
-  // el tamaño no es prioridad. (JPG sigue disponible en el selector.)
-  return 'png';
+  // Estático → PNG por defecto: política de MÁXIMA CALIDAD (re-codifica sin
+  // pérdida y conserva transparencia). Configurable en ⚙ Ajustes.
+  return oAuto(CONFIG.fmtWebpEstatico, () => 'png');
 }
 
 // Expande ZIPs: extrae los archivos compatibles que contengan (DecompressionStream nativo)
@@ -2324,7 +2510,7 @@ async function addFiles(fileList) {
   prog.style.display = 'none';
   $('#controls').style.display = 'flex';
   $('#filters').style.display = 'flex';
-  if ($('#facets')) $('#facets').style.display = 'flex';
+  actualizarVisibilidadFacetas();
   refreshCounters(); applyFilter();
   toast(`<b>${accepted.length}</b> archivo(s) añadidos`);
 }
@@ -2340,7 +2526,7 @@ function badgeFor(entry) {
   }
   if (i.animated) {
     const label = entry.kind === 'gif' ? 'GIF ANIMADO' : 'ANIMADO';
-    if (i.durationMs > 10000) return `<span class="badge video">🟠 ${label} · ${i.frames} frames · ${(i.durationMs/1000).toFixed(1)}s</span>`;
+    if (i.durationMs > CONFIG.umbralCortoMs) return `<span class="badge video">🟠 ${label} · ${i.frames} frames · ${(i.durationMs/1000).toFixed(1)}s</span>`;
     return `<span class="badge anim">🟣 ${label} · ${i.frames} frames</span>`;
   }
   const names = { lossy: 'LOSSY (VP8)', lossless: 'LOSSLESS (VP8L)', extended: 'ESTÁTICO (VP8X)', gif: 'GIF', png: 'PNG', jpg: 'JPEG', bmp: 'BMP' };
@@ -2484,7 +2670,8 @@ function removeEntry(entry) {
   if (!FILES.size) {
     $('#controls').style.display = 'none';
     $('#filters').style.display = 'none';
-    if ($('#facets')) $('#facets').style.display = 'none';
+    actualizarVisibilidadFacetas();
+    renderFiltrosAplicados();
   }
 }
 
@@ -3462,8 +3649,8 @@ function entryMatchesFilter(e, f) {
   switch (f) {
     case 'all': return true;
     case 'static': return e.kind !== 'video' && e.info && e.info.valid && !e.info.animated;
-    case 'anim': return e.kind !== 'video' && e.info && e.info.valid && e.info.animated && e.info.durationMs <= 10000;
-    case 'video': return (e.kind === 'video' && e.info && e.info.valid) || (e.kind !== 'video' && e.info && e.info.valid && e.info.animated && e.info.durationMs > 10000);
+    case 'anim': return e.kind !== 'video' && e.info && e.info.valid && e.info.animated && e.info.durationMs <= CONFIG.umbralCortoMs;
+    case 'video': return (e.kind === 'video' && e.info && e.info.valid) || (e.kind !== 'video' && e.info && e.info.valid && e.info.animated && e.info.durationMs > CONFIG.umbralCortoMs);
     case 'done': return e.status === 'done';
     case 'error': return e.status === 'error' || e.status === 'invalid';
   }
@@ -3480,8 +3667,8 @@ function entryMatchesFacets(e, except) {
   if (except !== 'fmt' && FACETS.fmt.size && !fmtDe(e).some(t => FACETS.fmt.has(t))) return false;
   if (except !== 'dur' && FACETS.dur !== 'all') {
     const d = i.durationMs || 0;
-    if (FACETS.dur === 'short' && !(d > 0 && d <= 10000)) return false;
-    if (FACETS.dur === 'long' && d <= 10000) return false;
+    if (FACETS.dur === 'short' && !(d > 0 && d <= CONFIG.umbralCortoMs)) return false;
+    if (FACETS.dur === 'long' && d <= CONFIG.umbralCortoMs) return false;
     if (FACETS.dur === 'static' && d > 0) return false;
   }
   if (except !== 'audio' && FACETS.audio !== 'all') {
@@ -3517,7 +3704,7 @@ function applyFilter() {
       if (facet === 'fmt') return val === 'webp' ? e.kind === 'webp' : i.type === val;
       if (facet === 'dur') {
         const d = i.durationMs || 0;
-        return val === 'short' ? (d > 0 && d <= 10000) : val === 'long' ? d > 10000 : d === 0;
+        return val === 'short' ? (d > 0 && d <= CONFIG.umbralCortoMs) : val === 'long' ? d > CONFIG.umbralCortoMs : d === 0;
       }
       if (facet === 'audio') return val === 'con' ? !!i.hasAudio : !i.hasAudio;
       if (facet === 'estado') return (e.status === 'invalid' ? 'error' : e.status) === val;
@@ -3527,21 +3714,68 @@ function applyFilter() {
     const el = $('.n', chip);
     if (el) el.textContent = n ? `(${n})` : '';
   }
-  const clearBtn = $('#facet-clear');
-  if (clearBtn) clearBtn.style.display = (facetsActive() || searchTerm) ? '' : 'none';
+  renderFiltrosAplicados();
 }
+// -- Cambia una faceta y sincroniza los chips del panel --
+function cambiarFaceta(facet, val, forzar) {
+  if (facet === 'fmt') {
+    const on = forzar === undefined ? !FACETS.fmt.has(val) : forzar;
+    if (on) FACETS.fmt.add(val); else FACETS.fmt.delete(val);
+  } else {
+    const on = forzar === undefined ? FACETS[facet] !== val : forzar;
+    FACETS[facet] = on ? val : 'all';
+  }
+  $$('.facet-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.facet === 'fmt' ? FACETS.fmt.has(c.dataset.val) : FACETS[c.dataset.facet] === c.dataset.val);
+  });
+}
+// -- Resumen de filtros APLICADOS: chips removibles + contador del toggle --
+const NOMBRE_FACETA = { fmt: 'Formato', dur: 'Duración', audio: 'Audio', estado: 'Estado' };
+function renderFiltrosAplicados() {
+  const cont = $('#af-chips');
+  if (!cont) return;
+  const txtDur = { short: () => `≤ ${CONFIG.umbralCortoMs / 1000} s`, long: () => `> ${CONFIG.umbralCortoMs / 1000} s`, static: () => 'sin duración' };
+  const txtOtros = { con: '🔊 con audio', sin: '🔇 sin audio', ready: 'pendiente', processing: 'procesando', done: 'completado', error: 'error' };
+  const chips = [];
+  const chip = (facet, val, texto) => `<span class="af-chip"><small>${NOMBRE_FACETA[facet]}:</small> ${texto} <button class="af-x" data-facet="${facet}" data-val="${val}" title="Quitar este filtro">✕</button></span>`;
+  for (const v of FACETS.fmt) chips.push(chip('fmt', v, v === 'webp' ? 'WebP' : (v.length <= 4 ? v.toUpperCase() : v)));
+  if (FACETS.dur !== 'all') chips.push(chip('dur', FACETS.dur, txtDur[FACETS.dur]()));
+  if (FACETS.audio !== 'all') chips.push(chip('audio', FACETS.audio, txtOtros[FACETS.audio]));
+  if (FACETS.estado !== 'all') chips.push(chip('estado', FACETS.estado, txtOtros[FACETS.estado]));
+  if (searchTerm) chips.push(`<span class="af-chip"><small>Búsqueda:</small> “${escapeHtml(searchTerm)}” <button class="af-x" data-facet="search" data-val="" title="Quitar la búsqueda">✕</button></span>`);
+  cont.innerHTML = chips.join('');
+  $('#applied-filters').classList.toggle('visible', chips.length > 0 && FILES.size > 0);
+  const cnt = $('#facets-count');
+  if (cnt) cnt.textContent = chips.length ? `(${chips.length})` : '';
+  const t = $('#facets-toggle');
+  if (t) t.classList.toggle('has-active', chips.length > 0);
+}
+$('#applied-filters') && $('#applied-filters').addEventListener('click', (e) => {
+  const x = e.target.closest('.af-x');
+  if (!x) return;
+  if (x.dataset.facet === 'search') { searchTerm = ''; $('#search').value = ''; }
+  else cambiarFaceta(x.dataset.facet, x.dataset.val, false);
+  applyFilter();
+});
+// -- Panel colapsable (estado persistente) --
+let facetsOpen = false;
+try { facetsOpen = localStorage.getItem('wf-facets-open') === '1'; } catch {}
+function actualizarVisibilidadFacetas() {
+  const p = $('#facets');
+  if (!p) return;
+  p.classList.toggle('open', facetsOpen && FILES.size > 0);
+  const t = $('#facets-toggle');
+  if (t) t.classList.toggle('open', facetsOpen);
+}
+$('#facets-toggle') && $('#facets-toggle').addEventListener('click', () => {
+  facetsOpen = !facetsOpen;
+  try { localStorage.setItem('wf-facets-open', facetsOpen ? '1' : '0'); } catch {}
+  actualizarVisibilidadFacetas();
+});
 $('#facets') && $('#facets').addEventListener('click', (e) => {
   const chip = e.target.closest('.facet-chip');
   if (!chip) return;
-  const { facet, val } = chip.dataset;
-  if (facet === 'fmt') {
-    if (FACETS.fmt.has(val)) { FACETS.fmt.delete(val); chip.classList.remove('active'); }
-    else { FACETS.fmt.add(val); chip.classList.add('active'); }
-  } else {
-    const yaActivo = FACETS[facet] === val;
-    FACETS[facet] = yaActivo ? 'all' : val;
-    $$(`.facet-chip[data-facet="${facet}"]`).forEach(c => c.classList.toggle('active', !yaActivo && c.dataset.val === val));
-  }
+  cambiarFaceta(chip.dataset.facet, chip.dataset.val);
   applyFilter();
 });
 $('#facet-clear') && $('#facet-clear').addEventListener('click', () => {
@@ -3657,6 +3891,75 @@ $('#btn-clear').addEventListener('click', () => {
   for (const e of [...FILES.values()]) removeEntry(e);
 });
 
+// ---------- ⚙ CONFIGURACIÓN: modal, persistencia y aplicación ----------
+function actualizarEtiquetasUmbral() {
+  const s = CONFIG.umbralCortoMs / 1000;
+  const txt = Number.isInteger(s) ? s : s.toFixed(1);
+  const set = (val, t) => {
+    const el = document.querySelector(`.facet-chip[data-facet="dur"][data-val="${val}"]`);
+    if (el && el.childNodes.length) el.childNodes[0].nodeValue = t + ' ';
+  };
+  set('short', `≤ ${txt} s`);
+  set('long', `> ${txt} s`);
+}
+function configALosControles() {
+  $('#cfg-umbral').value = Math.round(CONFIG.umbralCortoMs / 1000);
+  $('#cfg-regla-mudo').checked = !!CONFIG.reglaVideoMudoGif;
+  $('#cfg-destino-mudo').value = CONFIG.destinoVideoMudo;
+  $('#cfg-fmt-imagen').value = CONFIG.fmtImagen;
+  $('#cfg-fmt-webp-estatico').value = CONFIG.fmtWebpEstatico;
+  $('#cfg-fmt-gif-anim').value = CONFIG.fmtGifAnim;
+  $('#cfg-fmt-webp-anim').value = CONFIG.fmtWebpAnim;
+  $('#cfg-fmt-video').value = CONFIG.fmtVideo;
+  $('#cfg-calidad').value = CONFIG.calidad;
+  $('#cfg-calidad-v').textContent = CONFIG.calidad;
+}
+function abrirAjustes() { configALosControles(); $('#settings-modal').classList.add('open'); }
+function cerrarAjustes() { $('#settings-modal').classList.remove('open'); }
+$('#btn-settings').addEventListener('click', abrirAjustes);
+$('#settings-close').addEventListener('click', cerrarAjustes);
+$('#settings-modal').addEventListener('click', (e) => { if (e.target.id === 'settings-modal') cerrarAjustes(); });
+$('#cfg-calidad').addEventListener('input', (e) => { $('#cfg-calidad-v').textContent = e.target.value; });
+$('#cfg-restaurar').addEventListener('click', () => {
+  CONFIG = { ...CONFIG_DEFECTO };
+  configALosControles();
+  toast('↺ Valores de fábrica cargados — pulsa <b>Guardar</b> para aplicarlos');
+});
+$('#cfg-guardar').addEventListener('click', () => {
+  CONFIG.umbralCortoMs = Math.max(1, Math.min(600, +$('#cfg-umbral').value || 10)) * 1000;
+  CONFIG.reglaVideoMudoGif = $('#cfg-regla-mudo').checked;
+  CONFIG.destinoVideoMudo = $('#cfg-destino-mudo').value;
+  CONFIG.fmtImagen = $('#cfg-fmt-imagen').value;
+  CONFIG.fmtWebpEstatico = $('#cfg-fmt-webp-estatico').value;
+  CONFIG.fmtGifAnim = $('#cfg-fmt-gif-anim').value;
+  CONFIG.fmtWebpAnim = $('#cfg-fmt-webp-anim').value;
+  CONFIG.fmtVideo = $('#cfg-fmt-video').value;
+  CONFIG.calidad = Math.max(10, Math.min(100, +$('#cfg-calidad').value || 100));
+  try { localStorage.setItem('wf-config', JSON.stringify(CONFIG)); } catch {}
+  sessionPrefs.quality = CONFIG.calidad;
+  actualizarEtiquetasUmbral();
+  let n = 0;
+  if ($('#cfg-reaplicar').checked) {
+    sessionPrefs.format = '';
+    for (const e of FILES.values()) {
+      if (e.status !== 'ready') continue;
+      e.format = defaultFormatFor(e);
+      e.quality = CONFIG.calidad;
+      if (e.els.fmt) e.els.fmt.value = e.format;
+      if (e.els.qwrap) e.els.qwrap.style.display = ['jpg', 'webp'].includes(e.format) ? '' : 'none';
+      const qv = e.els.card.querySelector('.qv');
+      if (qv) qv.textContent = e.quality + '%';
+      const qr = e.els.card.querySelector('[data-act=q]');
+      if (qr) qr.value = e.quality;
+      n++;
+    }
+  }
+  refreshCounters(); applyFilter();
+  cerrarAjustes();
+  toast(`💾 Configuración guardada${n ? ` — formato sugerido recalculado en <b>${n}</b> archivo(s)` : ''}`);
+});
+actualizarEtiquetasUmbral();
+
 // ---------- Drop zone ----------
 const dz = $('#dropzone');
 dz.addEventListener('click', (e) => { if (e.target === dz || e.target.closest('.dz-icon, h2, p')) $('#file-input').click(); });
@@ -3700,7 +4003,11 @@ dz.addEventListener('drop', handleDrop); // redundante a propósito: garantiza c
 // ---------- Atajos de teclado ----------
 document.addEventListener('keydown', (e) => {
   const inInput = /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName) && document.activeElement.type !== 'checkbox';
-  if (e.key === 'Escape') { closeModal(); return; }
+  if (e.key === 'Escape') {
+    if ($('#settings-modal') && $('#settings-modal').classList.contains('open')) { cerrarAjustes(); return; }
+    closeModal();
+    return;
+  }
   if (inInput) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); $('#btn-selall').click(); }
   else if (e.key === 'Enter' && FILES.size) { e.preventDefault(); $('#btn-convert').click(); }
@@ -3716,7 +4023,8 @@ window.addEventListener('beforeunload', () => {
 });
 
 // Hook de depuración/integración (consola): window.WEBPFORGE
-window.WEBPFORGE = { version: '1.5.0', SETTINGS, FILES, CAP, addFiles, parseWebP, detectContainer };
+window.WEBPFORGE = { version: '1.6.0', SETTINGS, FILES, CAP, addFiles, parseWebP, detectContainer };
+Object.defineProperty(window.WEBPFORGE, 'CONFIG', { get: () => CONFIG });
 
 </script>
 
@@ -3842,6 +4150,34 @@ NOVEDADES v1.5 — SEEK CORRECTO EN VIDEO + MP4 REAL + REDISEÑO
   tarjetas (2 columnas en pantallas anchas), dropzone que se compacta al
   cargar archivos, tarjetas con franja de estado, miniaturas @2x, modal y
   toasts renovados. Misma estructura de IDs: los tests de DOM siguen pasando.
+
+NOVEDADES v1.6 — CONTROL DEL USUARIO + FILTROS PRO + VIDEO→MP4 SÓLIDO
+- ⚙ CONFIGURACIÓN persistente (localStorage): umbral de "animación corta",
+  regla video-mudo→GIF (activable y con destino configurable), formato por
+  defecto de cada tipo de entrada y calidad por defecto. "Auto" = lógica
+  recomendada según capacidades. Re-aplicable a los archivos ya cargados.
+- Regla nueva de métricas: video ≤ umbral SIN pista de audio propone GIF
+  (el audio se detecta a nivel de contenedor con parsers propios).
+- Filtros avanzados rediseñados según NN/g · Baymard · PatternFly: panel
+  COLAPSABLE con contador de activos, grupos en tarjetas (Formato con
+  subtipos WebP, Duración según umbral, Audio, Estado) y fila de FILTROS
+  APLICADOS con chips removibles (×) + "Limpiar todo" siempre visible.
+  Combinables entre sí, con la búsqueda y con "✓ Visibles".
+- "— por archivo —" vuelve a calcular el formato por defecto de cada
+  archivo (antes no revertía nada).
+- Video→MP4 sin audio en 3 niveles: transcodificación (demux EBML propio +
+  VideoDecoder + H.264, más rápida que tiempo real) → captura rVFC en
+  tiempo real → WebM clásico. Reintento HW→software (NVENC rechaza
+  resoluciones pequeñas), frames normalizados vía canvas (algunos encoders
+  no aceptan YUV: "Unexpected frame format") y flush protegido que ya no
+  enmascara el error original. Verificado en la app de escritorio: MP4 real
+  transcodificado en 0.3 s.
+- Bitrate heurístico por resolución/fps en todas las vías (los 16 Mbps
+  fijos inflaban los archivos +163%/+227%).
+- Análisis de video blindado: si el <video> del navegador se cuelga (visto
+  en uso real), los metadatos salen del contenedor (webmQuickMeta /
+  mp4QuickMeta / recorrido de bloques) y la validación cae a un chequeo
+  estructural. probeVideo con timeout de 6 s.
 
 QUÉ MEJORARÍA CON MÁS TIEMPO / BACKEND
 - Re-codificación de video→video también por WebCodecs (hoy usa MediaRecorder
